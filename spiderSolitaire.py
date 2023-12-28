@@ -199,13 +199,7 @@ class Board:
         if actions:
             return False
 
-        return not any(
-            self.is_valid_move(from_stack, to_stack, card_index)
-            for i, from_stack in enumerate(self.stacks)
-            for j, to_stack in enumerate(self.stacks)
-            if i != j
-            for card_index in range(len(from_stack.cards))
-        )
+        return True
 
     def draw_from_deck(self):
         """Draw more cards from the deck"""
@@ -261,7 +255,9 @@ class Board:
         for i, stack in enumerate(self.stacks):
             print(f"Stack {i}: ", end="")
             print(stack)
-        print("Completed Stacks: ", len(self.completed_stacks))
+        print(
+            f"Missing Deals: {len(self.deck.cards)/10}Completed Stacks: {len(self.completed_stacks)}"
+        )
 
     def get_state(self):
         """Return the current game state as a list of lists (each list represents a stack)."""

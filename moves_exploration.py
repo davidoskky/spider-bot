@@ -19,7 +19,7 @@ DEFAULT_WEIGTHS = {
 }
 
 
-def score_board(board, weights):
+def score_board(board, weights) -> int:
     """
     Evaluate and score the board state based on various criteria.
 
@@ -27,7 +27,7 @@ def score_board(board, weights):
     :param weights: A dictionary of weights for different scoring criteria.
     :return: The score of the board.
     """
-    score = 0
+    score: int = 0
 
     score += weights["visible_card_weight"] * board.count_visible_cards()
 
@@ -52,38 +52,15 @@ def score_board(board, weights):
     return score
 
 
+class Move(NamedTuple):
+    source_stack: int
+    destination_stack: int
+    card_index: int
+
+
 class BFS_element(NamedTuple):
     board: Board
-    path: list
-
-
-def is_board_winnable(initial_board: Board):
-    queue = deque([BFS_element(initial_board.clone(), [])])
-    visited = set()
-
-    while queue:
-        current = queue.popleft()
-        current_board, current_path = current.board, current.path
-        current_state = current_board.get_hashed_state()
-
-        if current_state in visited:
-            continue
-        visited.add(current_state)
-
-        if current_board.is_game_won():
-            return True
-
-        print(len(current_path))
-
-        for move in current_board.list_available_moves():
-            if len(move) == 3:
-                queue.append(_simulate_move(current_board, move, current_path))
-            elif len(move) == 1:
-                simulated_board = current_board.clone()
-                simulated_board.draw_from_deck()
-                queue.append(BFS_element(simulated_board, current_path + [move]))
-
-    return False
+    path: list[Move]
 
 
 def bfs_all_paths(
@@ -91,7 +68,7 @@ def bfs_all_paths(
 ):
     queue = deque([BFS_element(initial_board.clone(), [])])
     visited = set()
-    successful_paths = []
+    successful_paths: list[list[Move]] = []
 
     while queue:
         current = queue.popleft()
@@ -115,6 +92,7 @@ def bfs_all_paths(
 
         for move in current_board.list_available_moves():
             if len(move) == 3:
+                move = Move(*move)
                 queue.append(_simulate_move(current_board, move, current_path))
 
     return successful_paths
@@ -203,3 +181,32 @@ def is_less_cards_in_sequence(board: Board, sequence_cards: int) -> bool:
 
 def is_less_cards_breaking_stackable(board: Board, breaking_stackable: int) -> bool:
     return board.count_cards_breaking_stackable() < breaking_stackable
+
+
+def is_board_winnable(initial_board: Board):
+    queue = deque([BFS_element(initial_board.clone(), [])])
+    visited = set()
+
+    while queue:
+        current = queue.popleft()
+        current_board, current_path = current.board, current.path
+        current_state = current_board.get_hashed_state()
+
+        if current_state in visited:
+            continue
+        visited.add(current_state)
+
+        if current_board.is_game_won():
+            return True
+
+        print(len(current_path))
+
+        for move in current_board.list_available_moves():
+            if len(move) == 3:
+                queue.append(_simulate_move(current_board, move, current_path))
+            elif len(move) == 1:
+                simulated_board = current_board.clone()
+                simulated_board.draw_from_deck()
+                queue.append(BFS_element(simulated_board, current_path + [move]))
+
+    return False
