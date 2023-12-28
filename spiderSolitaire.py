@@ -1,3 +1,5 @@
+from tkinter import W
+from typing import Optional
 from networkx import is_empty
 from deck import Deck, SimpleDeck, Card
 import copy
@@ -119,22 +121,31 @@ class Board:
     CARDS_IN_SMALL_STACK = 5
     CARDS_IN_LARGE_STACK = 6
 
-    def __init__(self, seed=None, stacks=None, deck=None) -> None:
+    def __init__(
+        self,
+        seed: Optional[int] = None,
+        stacks: Optional[tuple[Stack, ...]] = None,
+        deck: Optional[Deck] = None,
+        completed_stacks: int = 0,
+    ) -> None:
         if stacks is not None and deck is not None:
-            self._initialize_for_cloning(stacks, deck)
+            self._initialize_for_cloning(stacks, deck, completed_stacks)
         else:
             self._initialize_new_game(seed)
 
-    def _initialize_for_cloning(self, stacks: list[Stack], deck):
+    def _initialize_for_cloning(
+        self, stacks: tuple[Stack, ...], deck, completed_stacks
+    ):
         self.deck = deck.clone()
-        self.stacks = [stack.clone() for stack in stacks]
-        self.completed_stacks = []
+        self.stacks = tuple([stack.clone() for stack in stacks])
+        self.completed_stacks = [1] * completed_stacks
 
     def _initialize_new_game(self, seed):
         self.deck = Deck(seed)
-        self.stacks: list[Stack] = []
+        self.stacks: tuple[Stack, ...]
         self.completed_stacks = []
 
+        generated_stacks = []
         for i in range(Board.INITIAL_STACKS_COUNT):
             num_face_down = (
                 Board.CARDS_IN_LARGE_STACK if i < 4 else Board.CARDS_IN_SMALL_STACK
@@ -142,12 +153,13 @@ class Board:
             stack_cards = self.deck.draw(num_face_down)
             stack = Stack(stack_cards)
 
-            self.stacks.append(stack)
+            generated_stacks.append(stack)
+
+        self.stacks = tuple(generated_stacks)
 
     def clone(self):
         """Create a new Board object with a deep clone of the card disposition."""
-        cloned_stacks = [stack.clone() for stack in self.stacks]
-        return Board(stacks=cloned_stacks, deck=self.deck.clone())
+        return Board(stacks=self.stacks, deck=self.deck.clone())
 
     def is_valid_move(self, from_stack: Stack, to_stack: Stack, card_index: int):
         """Check if moving a sequence of cards from one stack to another is valid."""
@@ -334,6 +346,9 @@ class Board:
             if stack.is_empty():
                 count += 1
         return count
+
+    def count_completed_stacks(self) -> int:
+        return len(self.completed_stacks)
 
     def stacks_sequence_lengths(self):
         sequences: list[int] = []

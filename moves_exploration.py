@@ -6,18 +6,19 @@ if TYPE_CHECKING:
     from spiderSolitaire import Board
 
 
-DEFAULT_WEIGTHS = {
-    "visible_card_weight": 1,
-    "hidden_card_weight": 5,
-    "breaking_stackable_weight": 3,
-    "breaking_sequence_weight": 3,
-    "empty_stack_weight": 10,
-    "sequence_length_weight": 2,
-    "stacked_length_weight": 2,
-    "total_rank_sequence_weight": 1,
-    "total_rank_stacked_weight": 1,
-    "stacked_length_indicator": 3,
-    "sequence_length_indicator": 3,
+DEFAULT_WEIGHTS = {
+    "visible_card_weight": 129.31059791,
+    "hidden_card_weight": 87.0175388,
+    "breaking_stackable_weight": -369.45669462,
+    "breaking_sequence_weight": 138.15459622,
+    "empty_stack_weight": 3000.2845636,
+    "count_completed_stacks": 10000.70034362,
+    "sequence_length_weight": 359.84705868,
+    "stacked_length_weight": 65.9502677,
+    "total_rank_sequence_weight": 179.44314697,
+    "total_rank_stacked_weight": -327.68215433,
+    "stacked_length_indicator": 179.52688487,
+    "sequence_length_indicator": 340.70034362,
 }
 
 
@@ -54,6 +55,9 @@ def score_board(board, weights) -> int:
     score += weights["stacked_length_indicator"] * board.stacked_length_indicator()
 
     score += weights["sequence_length_indicator"] * board.sequence_length_indicator()
+
+    score += weights["count_completed_stacks"] * board.count_completed_stacks()
+
     return score
 
 
@@ -147,23 +151,27 @@ def find_progressive_actions(board: Board):
     empty_stacks = board.count_empty_stacks()
     hidden_cards = board.count_hidden_cards()
     visible_cards = board.count_visible_cards()
+    initial_completed_stacks = board.count_completed_stacks()
     return bfs_all_paths(
         board,
         lambda board: is_more_empty_stacks(board, empty_stacks)
         or is_fewer_hidden_cards_condition(board, hidden_cards)
-        or is_more_visible_cards_condition(board, visible_cards),
+        or is_more_visible_cards_condition(board, visible_cards)
+        or is_more_completed_stacks(board, initial_completed_stacks),
         max_depth=8,
     )
 
 
 def find_improved_equivalent_position(board: Board):
     initial_sequence_length = board.sequence_length_indicator()
+    initial_completed_stacks = board.count_completed_stacks()
 
     return bfs_first_path(
         board,
         win_condition=lambda board: is_more_sequence_length_indicator(
             board, initial_sequence_length
-        ),
+        )
+        or is_more_completed_stacks(board, initial_completed_stacks),
         max_depth=8,
     )
 
@@ -212,6 +220,10 @@ def is_empty_stack_condition(board: Board) -> bool:
 
 def is_more_empty_stacks(board: Board, empty_stacks: int) -> bool:
     return board.count_empty_stacks() > empty_stacks
+
+
+def is_more_completed_stacks(board: Board, completed_stacks: int) -> bool:
+    return board.count_completed_stacks() > completed_stacks
 
 
 def is_fewer_hidden_cards_condition(board: Board, hidden_cards: int) -> bool:

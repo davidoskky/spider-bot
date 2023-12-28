@@ -1,6 +1,6 @@
 import pygad
 
-from moves_exploration import DEFAULT_WEIGTHS
+from moves_exploration import DEFAULT_WEIGHTS
 from spiderSolitaire import SpiderSolitaire
 from spiderSolitaireBot import SpiderSolitaireBot
 
@@ -23,15 +23,15 @@ def fitness_func(self, solution, solution_idx):
 
 
 def decode_solution(solution):
-    return {key: value for key, value in zip(DEFAULT_WEIGTHS.keys(), solution)}
+    return {key: value for key, value in zip(DEFAULT_WEIGHTS.keys(), solution)}
 
 
 ga_instance = pygad.GA(
-    num_generations=500,
+    num_generations=5,
     num_parents_mating=4,
     fitness_func=fitness_func,
     sol_per_pop=10,
-    num_genes=len(DEFAULT_WEIGTHS),
+    num_genes=len(DEFAULT_WEIGHTS),
     init_range_low=-500,
     init_range_high=500,
     mutation_percent_genes=5,

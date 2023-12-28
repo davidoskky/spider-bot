@@ -1,5 +1,5 @@
 from moves_exploration import (
-    DEFAULT_WEIGTHS,
+    DEFAULT_WEIGHTS,
     Move,
     find_improved_equivalent_position,
     find_move_increasing_stacked_length,
@@ -15,7 +15,7 @@ class SpiderSolitaireBot:
     def __init__(self, game: SpiderSolitaire):
         self.game = game
 
-    def select_best_progressive_action(self, weights=DEFAULT_WEIGTHS):
+    def select_best_progressive_action(self, weights=DEFAULT_WEIGHTS):
         """
         Select the best progressive action based on the scoring of resulting board states.
 
@@ -30,7 +30,7 @@ class SpiderSolitaireBot:
         return best_path, best_score
 
     def select_best_scoring_path(
-        self, paths: list[list[Move]], weights=DEFAULT_WEIGTHS
+        self, paths: list[list[Move]], weights=DEFAULT_WEIGHTS
     ):
         best_score = float("-inf")
         best_path = []
@@ -62,7 +62,7 @@ class SpiderSolitaireBot:
                 self.game.board
             ) + find_progressive_actions(self.game.board)
 
-    def play_heuristic(self, weights=DEFAULT_WEIGTHS, verbose=False):
+    def play_heuristic(self, weights=DEFAULT_WEIGHTS, verbose=False):
         current_score = score_board(self.game.board, weights)
         cycle = 0
 
@@ -115,7 +115,7 @@ class SpiderSolitaireBot:
             cycle += 1
             print(f"Completed cycle {cycle}")
 
-    def play_heuristic_old(self, weights=DEFAULT_WEIGTHS):
+    def play_heuristic_old(self, weights=DEFAULT_WEIGHTS):
         moves = True
         while moves:
             self.game.display_game_state()
