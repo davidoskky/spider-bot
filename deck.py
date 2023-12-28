@@ -5,22 +5,19 @@ SUITS = "♠♣♥♦"
 
 
 class Card:
-    def __init__(self, rank: int, suit, face_up=False):
+    def __init__(self, rank: int, suit):
         self.rank = rank
         self.suit = suit
-        self.face_up = face_up
 
     def clone(self):
         """Create a deep clone of this card."""
-        return Card(self.rank, self.suit, self.face_up)
+        return Card(self.rank, self.suit)
 
     def __repr__(self):
-        return f"{self.rank}{SUITS[self.suit]}" if self.face_up else "XX"
+        return f"{self.rank}{SUITS[self.suit]}"
 
     def encode(self):
         """Encode a card into a unique identifier."""
-        if not self.face_up:
-            return 0
         return self.suit * 13 + self.rank
 
     def can_stack(self, card: "Card") -> bool:
@@ -50,12 +47,10 @@ class Deck:
     def clone(self):
         return Deck(cards=self.cards)
 
-    def draw(self, count, face_up=False):
+    def draw(self, count):
         """Draw 'count' number of cards from the deck"""
         drawn_cards = self.cards[-count:]
         self.cards = self.cards[:-count]
-        for card in drawn_cards:
-            card.face_up = face_up
         return drawn_cards
 
 

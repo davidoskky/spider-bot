@@ -12,50 +12,6 @@ class SpiderSolitaireBot:
     def __init__(self, game: SpiderSolitaire):
         self.game = game
 
-    def evaluate_move(self, move):
-        """Evaluate and score the move based on a simple heuristic"""
-        from_stack, to_stack, card_index = move
-        score = 0
-
-        # Higher score for moves that uncover a hidden card
-        if card_index > 0 and not from_stack.cards[card_index - 1].face_up:
-            score += 5
-
-        # Higher score for moving to an empty stack
-        if to_stack.is_empty():
-            score += 3
-
-        return score
-
-    def select_best_move(self):
-        """Select the best move based on the evaluation"""
-        available_moves = self.game.board.list_available_moves()
-
-        # Filter out moves that are not between stacks
-        stack_moves = [move for move in available_moves if len(move) == 3]
-
-        # Avoid repeating the same move
-        stack_moves = [
-            move for move in stack_moves if move not in self.move_history[-4:]
-        ]
-
-        if not stack_moves:
-            return "draw_from_deck"
-
-        return max(stack_moves, key=self.evaluate_move)
-
-    def make_move(self):
-        """Make the best move according to the bot's strategy"""
-        best_move = self.select_best_move()
-
-        if best_move == "draw_from_deck":
-            self.game.draw_from_deck()
-            self.move_history = []
-        else:
-            from_index, to_index, card_index = best_move
-            self.game.move(from_index, to_index, card_index)
-            self.move_history.append(best_move)
-
     def select_best_progressive_action(self, weights=DEFAULT_WEIGTHS):
         """
         Select the best progressive action based on the scoring of resulting board states.
@@ -82,16 +38,6 @@ class SpiderSolitaireBot:
                 best_path = path
 
         return best_path
-
-    def play(self):
-        """Play the game until it is won or lost"""
-        while not self.game.is_game_won() and not self.game.is_game_lost():
-            self.make_move()
-
-        print(f"Game finished after {self.game.move_count} moves.")
-        if self.game.is_game_lost():
-            print(f"Game lost")
-            self.game.display_game_state()
 
     def play_bfs(self):
         moves = True

@@ -5,13 +5,35 @@ from moves_exploration import find_progressive_actions
 class Stack:
     def __init__(self, cards):
         self.cards = cards
+        self.first_visible_card = len(cards) - 1
+
+    def __repr__(self):
+        representation = ""
+        for i, card in enumerate(self.cards):
+            if i < self.first_visible_card:
+                representation += "XX "
+            else:
+                representation += repr(card) + " "
+
+        return representation
 
     def clone(self):
-        return Stack([card.clone() for card in self.cards])
+        cloned_stack = Stack(self.cards)
+        cloned_stack.first_visible_card = self.first_visible_card
+        return cloned_stack
+
+    def is_visible(self, card_index: int) -> bool:
+        """Check if the card at card_index is face-up (visible)."""
+        return card_index >= self.first_visible_card
+
+    def flip_top_card(self):
+        """Flip the top card to face-up."""
+        if self.cards and self.first_visible_card >= len(self.cards):
+            self.first_visible_card = len(self.cards) - 1
 
     def is_valid_sequence(self, start_index) -> bool:
         """Check if a sequence starting from start_index is valid."""
-        if start_index < 0 or not self.cards[start_index].face_up:
+        if not self.is_visible(start_index):
             return False
 
         return all(
@@ -22,36 +44,29 @@ class Stack:
 
     def is_valid_stacked(self, start_index):
         """Check if a sequence starting from start_index is valid"""
-        if start_index < 0 or not self.cards[start_index].face_up:
+        if self.is_visible(start_index):
             return False
 
-        if start_index == len(self.cards) - 1:
-            return True
-
-        for i in range(start_index, len(self.cards) - 1):
-            if not (self.cards[i].can_stack(self.cards[i + 1])):
-                return False
-
-        return True
+        return all(
+            self.cards[i].can_stack(self.cards[i + 1])
+            for i in range(start_index, len(self.cards) - 1)
+        )
 
     def visible_cards(self):
-        cards = [card for card in self.cards if card.face_up == True]
-        return cards
+        return self.cards[self.first_visible_card :]
 
     def hidden_cards(self):
-        cards = [card for card in self.cards if card.face_up == False]
-        return cards
+        return self.cards[: self.first_visible_card]
 
     def add_sequence(self, sequence):
         """Add a sequence of cards to the stack"""
         self.cards.extend(sequence)
 
     def remove_sequence(self, start_index):
-        """Remove and return a sequence of cards starting from start_index"""
+        if not self.is_visible(start_index):
+            raise ValueError("Cannot remove a hidden sequence")
         sequence = self.cards[start_index:]
         self.cards = self.cards[:start_index]
-        if self.cards and not self.cards[-1].face_up:
-            self.cards[-1].face_up = True
         return sequence
 
     def top_card(self):
@@ -62,7 +77,7 @@ class Stack:
 
     def first_card_of_valid_sequence(self) -> int:
         """Find the index of the first card of the valid sequence from the top."""
-        for i in range(len(self.cards)):
+        for i in range(self.first_visible_card, len(self.cards)):
             if self.is_valid_sequence(i):
                 return i
         return 0
@@ -97,8 +112,8 @@ class Stack:
 
 class Board:
     INITIAL_STACKS_COUNT = 10
-    CARDS_IN_SMALL_STACK = 4
-    CARDS_IN_LARGE_STACK = 5
+    CARDS_IN_SMALL_STACK = 5
+    CARDS_IN_LARGE_STACK = 6
 
     def __init__(self, seed=None, stacks=None, deck=None) -> None:
         if stacks is not None and deck is not None:
@@ -120,17 +135,17 @@ class Board:
             num_face_down = (
                 Board.CARDS_IN_LARGE_STACK if i < 4 else Board.CARDS_IN_SMALL_STACK
             )
-            stack_cards = self.deck.draw(num_face_down, face_up=False) + self.deck.draw(
-                1, face_up=True
-            )
-            self.stacks.append(Stack(stack_cards))
+            stack_cards = self.deck.draw(num_face_down)
+            stack = Stack(stack_cards)
+
+            self.stacks.append(stack)
 
     def clone(self):
         """Create a new Board object with a deep clone of the card disposition."""
         cloned_stacks = [stack.clone() for stack in self.stacks]
         return Board(stacks=cloned_stacks, deck=self.deck.clone())
 
-    def is_valid_move(self, from_stack, to_stack, card_index):
+    def is_valid_move(self, from_stack: Stack, to_stack: Stack, card_index: int):
         """Check if moving a sequence of cards from one stack to another is valid."""
         # Invalid if from_stack is empty or the sequence starting at card_index is not valid
         if from_stack.is_empty() or not from_stack.is_valid_sequence(card_index):
@@ -193,7 +208,7 @@ class Board:
         """Draw more cards from the deck"""
         if self.deck.cards:
             for stack in self.stacks:
-                drawn_card = self.deck.draw(1, face_up=True)
+                drawn_card = self.deck.draw(1)
                 stack.add_sequence(drawn_card)
                 self.check_for_completion(stack)
 
@@ -242,9 +257,7 @@ class Board:
         """Display the current state of the game"""
         for i, stack in enumerate(self.stacks):
             print(f"Stack {i}: ", end="")
-            for card in stack.cards:
-                print(card, end=" ")
-            print()
+            print(stack)
         print("Completed Stacks: ", len(self.completed_stacks))
 
     def get_state(self):
@@ -439,10 +452,10 @@ class SimpleSpiderSolitaire(SpiderSolitaire):
         self.just_completed_stack = False
 
         for _ in range(4):
-            stack_cards = self.deck.draw(1, face_up=True)
+            stack_cards = self.deck.draw(1)
             self.stacks.append(Stack(stack_cards))
 
         for _ in range(6):
-            stack_cards = self.deck.draw(2, face_up=False)
-            stack_cards += self.deck.draw(1, face_up=True)
+            stack_cards = self.deck.draw(2)
+            stack_cards += self.deck.draw(1)
             self.stacks.append(Stack(stack_cards))
