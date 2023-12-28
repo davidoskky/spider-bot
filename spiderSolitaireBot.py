@@ -63,6 +63,7 @@ class SpiderSolitaireBot:
                 improved_position_moves = find_improved_equivalent_position(
                     self.game.board
                 )
+            self.game.display_game_state()
             progressive_path = self.select_best_progressive_action(weights)
             if progressive_path:
                 moves = True

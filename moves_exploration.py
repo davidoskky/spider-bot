@@ -86,7 +86,9 @@ def is_board_winnable(initial_board: Board):
     return False
 
 
-def bfs_all_paths(initial_board: Board, win_condition, loss_condition=None):
+def bfs_all_paths(
+    initial_board: Board, win_condition, loss_condition=None, max_depth=None
+):
     queue = deque([BFS_element(initial_board.clone(), [])])
     visited = set()
     successful_paths = []
@@ -105,6 +107,10 @@ def bfs_all_paths(initial_board: Board, win_condition, loss_condition=None):
 
         if win_condition(current_board):
             successful_paths.append(current_path)
+            continue
+
+        # Stop expanding if the maximum depth is reached
+        if max_depth is not None and len(current_path) >= max_depth:
             continue
 
         for move in current_board.list_available_moves():
@@ -129,10 +135,12 @@ def find_progressive_actions(board: Board):
         lambda board: is_more_empty_stacks(board, empty_stacks)
         or is_fewer_hidden_cards_condition(board, hidden_cards)
         or is_more_visible_cards_condition(board, visible_cards),
+        max_depth=15,
     )
 
 
 def find_improved_equivalent_position(board: Board):
+    empty_stacks = board.count_empty_stacks()
     cards_in_sequence = sum(board.stacks_sequence_lengths())
     breaking_stackable = board.count_cards_breaking_stackable()
     hidden_cards = board.count_hidden_cards()
@@ -140,9 +148,28 @@ def find_improved_equivalent_position(board: Board):
     return bfs_all_paths(
         board,
         win_condition=lambda board: is_more_cards_in_sequence(board, cards_in_sequence),
-        loss_condition=lambda board: is_empty_stack_condition(board)
+        loss_condition=lambda board: is_more_empty_stacks(board, empty_stacks)
         or is_fewer_hidden_cards_condition(board, hidden_cards)
         or is_less_cards_breaking_stackable(board, breaking_stackable),
+        max_depth=8,
+    )
+
+
+def find_moves_freeing_covered_cards(board: Board):
+    empty_stacks = board.count_empty_stacks()
+    cards_in_sequence = sum(board.stacks_sequence_lengths())
+    breaking_stackable = board.count_cards_breaking_stackable()
+    hidden_cards = board.count_hidden_cards()
+
+    return bfs_all_paths(
+        board,
+        win_condition=lambda board: is_less_cards_breaking_stackable(
+            board, breaking_stackable
+        ),
+        loss_condition=lambda board: is_more_empty_stacks(board, empty_stacks)
+        or is_fewer_hidden_cards_condition(board, hidden_cards)
+        or is_less_cards_in_sequence(board, cards_in_sequence),
+        max_depth=8,
     )
 
 
@@ -167,6 +194,10 @@ def is_less_cards_stacked(board: Board, stacked_cards: int) -> bool:
 
 
 def is_more_cards_in_sequence(board: Board, sequence_cards: int) -> bool:
+    return sum(board.stacks_sequence_lengths()) > sequence_cards
+
+
+def is_less_cards_in_sequence(board: Board, sequence_cards: int) -> bool:
     return sum(board.stacks_sequence_lengths()) < sequence_cards
 
 

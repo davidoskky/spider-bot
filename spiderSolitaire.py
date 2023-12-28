@@ -1,4 +1,5 @@
-from deck import Deck, SimpleDeck
+from deck import Deck, SimpleDeck, Card
+import copy
 from moves_exploration import find_progressive_actions
 
 
@@ -18,13 +19,16 @@ class Stack:
         return representation
 
     def clone(self):
-        cloned_stack = Stack(self.cards)
+        cloned_stack = Stack(copy.copy(self.cards))
         cloned_stack.first_visible_card = self.first_visible_card
         return cloned_stack
 
     def is_visible(self, card_index: int) -> bool:
         """Check if the card at card_index is face-up (visible)."""
         return card_index >= self.first_visible_card
+
+    def can_stack(self, card: Card) -> bool:
+        return self.is_empty() or self.top_card().can_stack(card)
 
     def flip_top_card(self):
         """Flip the top card to face-up."""
@@ -67,6 +71,7 @@ class Stack:
             raise ValueError("Cannot remove a hidden sequence")
         sequence = self.cards[start_index:]
         self.cards = self.cards[:start_index]
+        self.flip_top_card()
         return sequence
 
     def top_card(self):
@@ -147,16 +152,22 @@ class Board:
 
     def is_valid_move(self, from_stack: Stack, to_stack: Stack, card_index: int):
         """Check if moving a sequence of cards from one stack to another is valid."""
-        # Invalid if from_stack is empty or the sequence starting at card_index is not valid
-        if from_stack.is_empty() or not from_stack.is_valid_sequence(card_index):
+        if from_stack.is_empty():
             return False
 
-        # Valid if moving to an empty stack or if the top card of to_stack can stack with the card at card_index of from_stack
-        return to_stack.is_empty() or to_stack.top_card().can_stack(
-            from_stack.cards[card_index]
-        )
+        # Optimization: Do not allow moving a card on an empty stack to another empty stack
+        # This check is more efficient as it does not require sequence validation
+        if card_index == 0 and to_stack.is_empty():
+            return False
 
-    def move(self, source_stack, destination_stack, card_index):
+        # Check if the sequence starting at 'card_index' is valid
+        # This is more computationally intensive, so it's done after simpler checks
+        if not from_stack.is_valid_sequence(card_index):
+            return False
+
+        return to_stack.can_stack(from_stack.cards[card_index])
+
+    def move(self, source_stack: Stack, destination_stack: Stack, card_index: int):
         """Move a sequence of cards from one stack to another"""
         if not self.is_valid_move(source_stack, destination_stack, card_index):
             source_id = self.stacks.index(source_stack)
@@ -189,19 +200,11 @@ class Board:
             return False
 
         return not any(
-            self._is_valid_move_within_stacks(from_stack, to_stack, card_index)
+            self.is_valid_move(from_stack, to_stack, card_index)
             for i, from_stack in enumerate(self.stacks)
             for j, to_stack in enumerate(self.stacks)
             if i != j
             for card_index in range(len(from_stack.cards))
-        )
-
-    def _is_valid_move_within_stacks(
-        self, from_stack: Stack, to_stack: Stack, card_index: int
-    ):
-        """Check if there is a valid move from one stack to another."""
-        return from_stack.is_valid_sequence(card_index) and self.is_valid_move(
-            from_stack, to_stack, card_index
         )
 
     def draw_from_deck(self):
