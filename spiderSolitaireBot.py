@@ -2,6 +2,7 @@ from moves_exploration import (
     DEFAULT_WEIGTHS,
     Move,
     find_improved_equivalent_position,
+    find_move_increasing_stacked_length,
     find_moves_freeing_covered_cards,
     find_progressive_actions,
     is_board_winnable,
@@ -61,48 +62,54 @@ class SpiderSolitaireBot:
                 self.game.board
             ) + find_progressive_actions(self.game.board)
 
-    def play_heuristic(self, weights=DEFAULT_WEIGTHS):
+    def play_heuristic(self, weights=DEFAULT_WEIGTHS, verbose=False):
         current_score = score_board(self.game.board, weights)
         cycle = 0
+
+        def try_execute_moves(moves, description=""):
+            nonlocal current_score, moves_made
+            if moves:
+                if verbose:
+                    print(description)
+                    print(moves)
+                for move in moves:
+                    self.game.board.move_by_index(*move)
+                current_score = score_board(self.game.board, weights)
+                moves_made = True
 
         while True:
             self.game.display_game_state()
             moves_made = False
 
-            # Execute all improved equivalent positions
-            improved_position_moves = find_improved_equivalent_position(self.game.board)
-            if improved_position_moves:
-                self._execute_moves(improved_position_moves)
-                moves_made = True
+            try_execute_moves(
+                find_improved_equivalent_position(self.game.board), "Improved"
+            )
+            try_execute_moves(
+                find_move_increasing_stacked_length(self.game.board), "Stacked"
+            )
 
-            # If no improved equivalent positions were made, find and score other moves
+            if not moves_made:
+                progressive_path, score = self.select_best_progressive_action(weights)
+                try_execute_moves(progressive_path, "Progressive")
+
             if not moves_made:
                 all_other_moves, score = self.select_best_scoring_path(
                     find_moves_freeing_covered_cards(self.game.board), weights
                 )
                 if all_other_moves and current_score < score:
-                    for move in all_other_moves:
-                        self.game.board.move_by_index(*move)
-                    current_score = score
-                    moves_made = True
-
-            # If no moves were made so far, try progressive moves
-            if not moves_made:
-                progressive_path, score = self.select_best_progressive_action(weights)
-                if progressive_path:
-                    for move in progressive_path:
-                        self.game.board.move_by_index(*move)
-                    current_score = score
-                    moves_made = True
+                    try_execute_moves(all_other_moves, "Other")
 
             # If still no moves were made and cards are in the deck, draw from deck
             if not moves_made and len(self.game.board.deck.cards) > 0:
+                if verbose:
+                    print("Deck")
                 self.game.board.draw_from_deck()
                 current_score = score_board(self.game.board, weights)
                 moves_made = True
 
             if not moves_made:
-                print("No moves available.")
+                if verbose:
+                    print("No moves available.")
                 break
 
             cycle += 1

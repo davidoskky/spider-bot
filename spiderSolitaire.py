@@ -1,6 +1,7 @@
+from networkx import is_empty
 from deck import Deck, SimpleDeck, Card
 import copy
-from moves_exploration import find_progressive_actions
+from moves_exploration import Move, find_progressive_actions
 
 
 class Stack:
@@ -9,14 +10,11 @@ class Stack:
         self.first_visible_card = len(cards) - 1
 
     def __repr__(self):
-        representation = ""
-        for i, card in enumerate(self.cards):
-            if i < self.first_visible_card:
-                representation += "XX "
-            else:
-                representation += repr(card) + " "
-
-        return representation
+        representation = [
+            repr(card) + " " if i >= self.first_visible_card else "XX "
+            for i, card in enumerate(self.cards)
+        ]
+        return "".join(representation)
 
     def clone(self):
         cloned_stack = Stack(copy.copy(self.cards))
@@ -36,24 +34,25 @@ class Stack:
             self.first_visible_card = len(self.cards) - 1
 
     def is_valid_sequence(self, start_index) -> bool:
-        """Check if a sequence starting from start_index is valid."""
         if not self.is_visible(start_index):
             return False
 
         return all(
-            self.cards[i].can_stack(self.cards[i + 1])
-            and self.cards[i].same_suit(self.cards[i + 1])
-            for i in range(start_index, len(self.cards) - 1)
+            card.can_stack(next_card) and card.same_suit(next_card)
+            for card, next_card in zip(
+                self.cards[start_index:], self.cards[start_index + 1 :]
+            )
         )
 
     def is_valid_stacked(self, start_index):
-        """Check if a sequence starting from start_index is valid"""
         if self.is_visible(start_index):
             return False
 
         return all(
-            self.cards[i].can_stack(self.cards[i + 1])
-            for i in range(start_index, len(self.cards) - 1)
+            card.can_stack(next_card)
+            for card, next_card in zip(
+                self.cards[start_index:], self.cards[start_index + 1 :]
+            )
         )
 
     def visible_cards(self):
@@ -250,6 +249,28 @@ class Board:
         """List moves related to the deck, if any."""
         return [("draw_from_deck",)] if self.deck.cards else []
 
+    def is_move_indifferent(self, move: Move) -> bool:
+        """
+        Determine if a move is indifferent regarding the future freedom of moves.
+
+        A move is considered indifferent in two cases:
+        1. Moving the topmost visible card from one stack to another, regardless of the card it is moved to.
+        2. Moving any card from a stack where the immediately lower card (if visible) can stack on the moved card.
+
+        :param move: The move to be evaluated, represented as a Move object.
+        :return: True if the move is indifferent, False otherwise.
+        """
+        if move.card_index == 0:
+            return True
+        source_stack = self.stacks[move.source_stack]
+
+        if source_stack.is_visible(move.card_index - 1) and source_stack.cards[
+            move.card_index - 1
+        ].can_stack(source_stack.cards[move.card_index]):
+            return True
+
+        return False
+
     def display_game_state(self):
         """Display the current state of the game"""
         for i, stack in enumerate(self.stacks):
@@ -351,6 +372,87 @@ class Board:
                 rank += card.rank
 
         return rank
+
+    def stacked_length_indicator(self) -> int:
+        """
+        Calculate a value based on the product of the highest card rank in each valid stacked sequence
+        and the length of that sequence for each stack on the board.
+
+        This function iterates through each stack on the board, examining the stacked cards.
+        It sums up the products of the highest card rank in each valid stacked sequence and the length of that sequence,
+        providing an indicator value for the board.
+
+        The indicator helps in assessing the current state of the board by valuing longer stacked sequences more highly.
+
+        :return: The sum of the products of the highest card ranks in stacked sequences and their lengths.
+        """
+        total_indicator = 0
+        for stack in self.stacks:
+            if stack.is_empty():
+                continue
+
+            cards = stack.visible_cards()
+            current_rank = cards[0].rank
+            current_sequence = 1
+            for i in range(1, len(cards)):
+                if cards[i - 1].can_stack(cards[i]):
+                    current_sequence += 1
+                else:
+                    total_indicator += current_rank * current_sequence
+                    current_sequence = 1
+                    current_rank = cards[i].rank
+
+            total_indicator += current_rank * current_sequence
+        return total_indicator
+
+    # def stacked_length_indicator(self) -> int:
+    #    """Product of the highest card in the valid stack by the length of the stack
+    #    This should be useful to identify whether moving a card from a stack to another
+    #    leads to a situation in which you get a longer stack."""
+    #    indicator = 0
+    #    for stack in self.stacks:
+    #        if stack.is_empty():
+    #            continue
+    #        else:
+    #            card_index = stack.first_card_of_valid_stacked()
+    #            card_rank = stack.cards[card_index].rank
+    #            indicator += card_rank * (len(stack.cards) - card_index)
+    #    return indicator
+
+    def sequence_length_indicator(self) -> int:
+        """
+        Calculate the sequence length indicator for each visible sequence in the stacks.
+
+        This function iterates through each stack on the board, examining the visible
+        cards. For each sequence of cards in the same suit that can be stacked on each other,
+        it calculates the product of the sequence's length and the rank of the starting card.
+        These products are then summed up to give a total indicator value for the board.
+
+        The indicator helps in assessing the current state of the board by valuing longer
+        sequences of the same suit more highly.
+
+        :return: The sum of the products of sequence lengths and their starting card ranks.
+        """
+        total_indicator = 0
+        for stack in self.stacks:
+            if stack.is_empty():
+                continue
+
+            cards = stack.visible_cards()
+            current_rank = cards[0].rank
+            current_sequence = 1
+            for i in range(1, len(cards)):
+                if cards[i - 1].can_stack(cards[i]) and cards[i - 1].same_suit(
+                    cards[i]
+                ):
+                    current_sequence += 1
+                else:
+                    total_indicator += current_rank * current_sequence
+                    current_sequence = 1
+                    current_rank = cards[i].rank
+
+            total_indicator += current_rank * current_sequence
+        return total_indicator
 
 
 class SpiderSolitaire:
