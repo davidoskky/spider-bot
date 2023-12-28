@@ -63,6 +63,7 @@ class SpiderSolitaireBot:
 
     def play_heuristic(self, weights=DEFAULT_WEIGTHS):
         current_score = score_board(self.game.board, weights)
+        cycle = 0
 
         while True:
             self.game.display_game_state()
@@ -104,7 +105,8 @@ class SpiderSolitaireBot:
                 print("No moves available.")
                 break
 
-            print("Completed cycle")
+            cycle += 1
+            print(f"Completed cycle {cycle}")
 
     def play_heuristic_old(self, weights=DEFAULT_WEIGTHS):
         moves = True
