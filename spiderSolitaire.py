@@ -1,15 +1,18 @@
-from tkinter import W
 from typing import Optional
-from networkx import is_empty
 from deck import Deck, SimpleDeck, Card
 import copy
 from moves_exploration import Move, find_progressive_actions
 
 
 class Stack:
+    """
+    Represents a stack of cards in Spider Solitaire.
+    """
+
     def __init__(self, cards):
         self.cards = cards
         self.first_visible_card = len(cards) - 1
+        self.first_accessible_sequence = self.first_card_of_valid_sequence()
 
     def __repr__(self):
         representation = [
@@ -21,6 +24,7 @@ class Stack:
     def clone(self):
         cloned_stack = Stack(copy.copy(self.cards))
         cloned_stack.first_visible_card = self.first_visible_card
+        cloned_stack.first_accessible_sequence = self.first_accessible_sequence
         return cloned_stack
 
     def is_visible(self, card_index: int) -> bool:
@@ -30,28 +34,24 @@ class Stack:
     def can_stack(self, card: Card) -> bool:
         return self.is_empty() or self.top_card().can_stack(card)
 
-    def flip_top_card(self):
+    def reveal_top_card(self):
         """Flip the top card to face-up."""
         if self.cards and self.first_visible_card >= len(self.cards):
             self.first_visible_card = len(self.cards) - 1
 
-    def is_valid_sequence(self, start_index) -> bool:
-        if not self.is_visible(start_index):
-            return False
-
-        return all(
-            card.can_stack(next_card) and card.same_suit(next_card)
-            for card, next_card in zip(
-                self.cards[start_index:], self.cards[start_index + 1 :]
-            )
+    def is_valid_suit_sequence(self, start_index: int) -> bool:
+        return self._is_valid_sequence(
+            start_index, lambda c, n: c.can_stack(n) and c.same_suit(n)
         )
 
-    def is_valid_stacked(self, start_index):
-        if self.is_visible(start_index):
-            return False
+    def is_valid_stacked_sequence(self, start_index: int) -> bool:
+        return self._is_valid_sequence(start_index, lambda c, n: c.can_stack(n))
 
+    def _is_valid_sequence(self, start_index: int, condition) -> bool:
+        if not self.is_visible(start_index):
+            return False
         return all(
-            card.can_stack(next_card)
+            condition(card, next_card)
             for card, next_card in zip(
                 self.cards[start_index:], self.cards[start_index + 1 :]
             )
@@ -63,16 +63,21 @@ class Stack:
     def hidden_cards(self):
         return self.cards[: self.first_visible_card]
 
+    def is_movable(self, card_index: int) -> bool:
+        return card_index >= self.first_accessible_sequence
+
     def add_sequence(self, sequence):
         """Add a sequence of cards to the stack"""
         self.cards.extend(sequence)
+        self.first_accessible_sequence = self.first_card_of_valid_sequence()
 
-    def remove_sequence(self, start_index):
+    def pop_sequence(self, start_index):
         if not self.is_visible(start_index):
             raise ValueError("Cannot remove a hidden sequence")
         sequence = self.cards[start_index:]
         self.cards = self.cards[:start_index]
-        self.flip_top_card()
+        self.reveal_top_card()
+        self.first_accessible_sequence = self.first_card_of_valid_sequence()
         return sequence
 
     def top_card(self):
@@ -84,7 +89,7 @@ class Stack:
     def first_card_of_valid_sequence(self) -> int:
         """Find the index of the first card of the valid sequence from the top."""
         for i in range(self.first_visible_card, len(self.cards)):
-            if self.is_valid_sequence(i):
+            if self.is_valid_suit_sequence(i):
                 return i
         return 0
 
@@ -93,19 +98,19 @@ class Stack:
 
     def first_card_not_in_sequence(self):
         """Find the index of the first card that is not in sequence from the top."""
-        i = self.first_card_of_valid_sequence()
+        i = self.first_accessible_sequence
         if i > 0:
             return i - 1
         else:
             return None
 
     def get_sequence(self):
-        return self.cards[self.first_card_of_valid_sequence() :]
+        return self.cards[self.first_accessible_sequence :]
 
     def first_card_of_valid_stacked(self) -> int:
         """Find the index of the first card of the valid sequence from the top."""
         for i in range(len(self.cards)):
-            if self.is_valid_stacked(i):
+            if self.is_valid_stacked_sequence(i):
                 return i
         return 0
 
@@ -161,22 +166,17 @@ class Board:
         """Create a new Board object with a deep clone of the card disposition."""
         return Board(stacks=self.stacks, deck=self.deck.clone())
 
-    def is_valid_move(self, from_stack: Stack, to_stack: Stack, card_index: int):
-        """Check if moving a sequence of cards from one stack to another is valid."""
+    def is_valid_move(
+        self, from_stack: Stack, to_stack: Stack, card_index: int
+    ) -> bool:
         if from_stack.is_empty():
             return False
 
-        # Optimization: Do not allow moving a card on an empty stack to another empty stack
-        # This check is more efficient as it does not require sequence validation
         if card_index == 0 and to_stack.is_empty():
             return False
-
-        # Check if the sequence starting at 'card_index' is valid
-        # This is more computationally intensive, so it's done after simpler checks
-        if not from_stack.is_valid_sequence(card_index):
-            return False
-
-        return to_stack.can_stack(from_stack.cards[card_index])
+        return to_stack.can_stack(
+            from_stack.cards[card_index]
+        ) and from_stack.is_valid_suit_sequence(card_index)
 
     def move(self, source_stack: Stack, destination_stack: Stack, card_index: int):
         """Move a sequence of cards from one stack to another"""
@@ -187,7 +187,7 @@ class Board:
             raise ValueError(
                 f"Invalid move attempted. From {source_id}, To {destination_id}, card {card_index}"
             )
-        sequence_to_move = source_stack.remove_sequence(card_index)
+        sequence_to_move = source_stack.pop_sequence(card_index)
         destination_stack.add_sequence(sequence_to_move)
         self.check_for_completion(destination_stack)
 
@@ -227,11 +227,12 @@ class Board:
     def check_for_completion(self, stack):
         """Check and update for any completed stacks in the given stack"""
         self.just_completed_stack = False
-        if len(stack.cards) >= 13 and stack.is_valid_sequence(len(stack.cards) - 13):
+        if len(stack.cards) >= 13 and stack.is_valid_suit_sequence(
+            len(stack.cards) - 13
+        ):
             completed_sequence = stack.remove_sequence(len(stack.cards) - 13)
             self.completed_stacks.append(completed_sequence)
             self.just_completed_stack = True
-            print("Completed sequence moved to the completed stacks.")
 
     def list_available_moves(self):
         """List all available moves in the current game state."""
@@ -243,7 +244,7 @@ class Board:
         moves = []
         for i, from_stack in enumerate(self.stacks):
             for card_index in range(
-                from_stack.first_card_of_valid_sequence(), len(from_stack.cards)
+                from_stack.first_accessible_sequence, len(from_stack.cards)
             ):
                 moves.extend(self._get_valid_moves_to_other_stacks(i, card_index))
         return moves
@@ -305,27 +306,25 @@ class Board:
     def get_hashed_state(self):
         return hash(self.get_state())
 
-    def count_cards_breaking_stackable(self) -> int:
-        """Count the number of cards that break a sequence without considering suit"""
+    def _count_breaking_cards(self, condition):
         count = 0
         for stack in self.stacks:
-            cards = stack.visible_cards()
-            for i in range(1, len(cards)):
-                if not cards[i - 1].can_stack(cards[i]):
+            for i in range(1, len(stack.visible_cards())):
+                if condition(stack.visible_cards(), i):
                     count += 1
         return count
 
-    def count_cards_breaking_sequence(self) -> int:
-        """Count the number of cards that break a sequence without considering suit"""
-        count = 0
-        for stack in self.stacks:
-            cards = stack.visible_cards()
-            for i in range(1, len(cards)):
-                if not (
-                    cards[i - 1].can_stack(cards[i]) or cards[i - 1].same_suit(cards[i])
-                ):
-                    count += 1
-        return count
+    def count_cards_breaking_stackable(self):
+        return self._count_breaking_cards(
+            lambda cards, i: not cards[i - 1].can_stack(cards[i])
+        )
+
+    def count_cards_breaking_sequence(self):
+        return self._count_breaking_cards(
+            lambda cards, i: not (
+                cards[i - 1].can_stack(cards[i]) and cards[i - 1].same_suit(cards[i])
+            )
+        )
 
     def count_hidden_cards(self) -> int:
         """Count the number of hidden cards"""
@@ -511,9 +510,7 @@ class SpiderSolitaire:
         to_stack = self.board.stacks[to_stack_index]
 
         if to_stack.is_empty():
-            # Special logic for moving to an empty pile
-            # Move the longest valid sequence or any card
-            card_index = from_stack.first_card_of_valid_sequence()
+            card_index = from_stack.first_accessible_sequence
             self.move(from_stack, to_stack, card_index)
             return True
 
