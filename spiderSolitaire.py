@@ -1,3 +1,4 @@
+from operator import is_
 from typing import Optional
 from deck import Deck, SimpleDeck, Card
 import copy
@@ -57,7 +58,7 @@ class Stack:
             )
         )
 
-    def visible_cards(self):
+    def visible_cards(self) -> list[Card]:
         return self.cards[self.first_visible_card :]
 
     def hidden_cards(self):
@@ -117,8 +118,61 @@ class Stack:
     def valid_stacked_length(self) -> int:
         return len(self.cards) - self.first_card_of_valid_stacked()
 
-    def get_stacked(self):
+    def get_stacked(self) -> list[Card]:
+        "Gets all the cards in the first accessible stacked sequence"
         return self.cards[self.first_card_of_valid_stacked() :]
+
+    def get_all_stacked_sequences(self):
+        """
+        Generate a list of lists, where each inner list contains the cards in a valid stacked sequence
+        from each stack on the board.
+
+        This function iterates through each stack on the board, examining the stacked cards.
+        It creates a list for each valid stacked sequence and adds these lists to an outer list.
+
+        :return: A list of lists, each containing the cards in a valid stacked sequence.
+        """
+        all_stacked_sequences = []
+        if self.is_empty():
+            return all_stacked_sequences
+
+        cards = self.visible_cards()
+        current_sequence = [cards[0]]
+        for i in range(1, len(cards)):
+            if cards[i - 1].can_stack(cards[i]):
+                current_sequence.append(cards[i])
+            else:
+                all_stacked_sequences.append(current_sequence)
+                current_sequence = [cards[i]]
+
+        all_stacked_sequences.append(current_sequence)
+        return all_stacked_sequences
+
+    def get_all_sequences(self):
+        """
+        Generate a list of lists, where each inner list contains the cards in a valid stacked sequence
+        from each stack on the board.
+
+        This function iterates through each stack on the board, examining the stacked cards.
+        It creates a list for each valid stacked sequence and adds these lists to an outer list.
+
+        :return: A list of lists, each containing the cards in a valid stacked sequence.
+        """
+        all_stacked_sequences = []
+        if self.is_empty():
+            return all_stacked_sequences
+
+        cards = self.visible_cards()
+        current_sequence = [cards[0]]
+        for i in range(1, len(cards)):
+            if cards[i - 1].can_sequence(cards[i]):
+                current_sequence.append(cards[i])
+            else:
+                all_stacked_sequences.append(current_sequence)
+                current_sequence = [cards[i]]
+
+        all_stacked_sequences.append(current_sequence)
+        return all_stacked_sequences
 
 
 class Board:
@@ -224,13 +278,13 @@ class Board:
         else:
             return False
 
-    def check_for_completion(self, stack):
+    def check_for_completion(self, stack: Stack):
         """Check and update for any completed stacks in the given stack"""
         self.just_completed_stack = False
         if len(stack.cards) >= 13 and stack.is_valid_suit_sequence(
             len(stack.cards) - 13
         ):
-            completed_sequence = stack.remove_sequence(len(stack.cards) - 13)
+            completed_sequence = stack.pop_sequence(len(stack.cards) - 13)
             self.completed_stacks.append(completed_sequence)
             self.just_completed_stack = True
 
@@ -346,6 +400,40 @@ class Board:
                 count += 1
         return count
 
+    def count_blocked_stacks(self) -> int:
+        """How many stacks have a king on basement"""
+        count = 0
+        for stack in self.stacks:
+            if stack.is_empty() or stack.first_visible_card != 0:
+                continue
+            if stack.cards[0].rank == 13:
+                count += 1
+        return count
+
+    def count_semi_empty_stacks(self) -> int:
+        """
+        Count the number of stacks that can be emptied in a single move.
+
+        A stack is considered 'semi-empty' if the sequence of visible cards
+        on top of the stack can be legally moved to another stack, thus emptying it.
+
+        :return: The number of semi-empty stacks.
+        """
+        semi_empty_count = 0
+
+        for stack_index, stack in enumerate(self.stacks):
+            if stack.is_empty():
+                continue
+
+            # Check if the entire visible sequence can be moved
+            top_sequence_start = stack.first_accessible_sequence
+            if top_sequence_start == 0 and self._get_valid_moves_to_other_stacks(
+                stack_index, 0
+            ):
+                semi_empty_count += 1
+
+        return semi_empty_count
+
     def count_completed_stacks(self) -> int:
         return len(self.completed_stacks)
 
@@ -419,20 +507,6 @@ class Board:
             total_indicator += current_rank * current_sequence
         return total_indicator
 
-    # def stacked_length_indicator(self) -> int:
-    #    """Product of the highest card in the valid stack by the length of the stack
-    #    This should be useful to identify whether moving a card from a stack to another
-    #    leads to a situation in which you get a longer stack."""
-    #    indicator = 0
-    #    for stack in self.stacks:
-    #        if stack.is_empty():
-    #            continue
-    #        else:
-    #            card_index = stack.first_card_of_valid_stacked()
-    #            card_rank = stack.cards[card_index].rank
-    #            indicator += card_rank * (len(stack.cards) - card_index)
-    #    return indicator
-
     def sequence_length_indicator(self) -> int:
         """
         Calculate the sequence length indicator for each visible sequence in the stacks.
@@ -467,6 +541,39 @@ class Board:
 
             total_indicator += current_rank * current_sequence
         return total_indicator
+
+    def count_accessible_full_sequences(self) -> int:
+        """
+        Count the number of full sequences that can be made from readily accessible cards
+        in the available stacked sequences on the board.
+
+        A full sequence in Spider Solitaire typically involves a descending order
+        from King to Ace of the same suit. This function iterates through each stack,
+        starting from the first accessible card, and counts the number of such sequences.
+
+        :return: The number of complete sequences available from accessible cards.
+        """
+        full_sequence_count = 0
+
+        accessible_cards = []
+        for stack in self.stacks:
+            stacked_cards = stack.get_stacked()
+            if stacked_cards:
+                accessible_cards.extend(stacked_cards)
+
+        for suit in range(4):
+            rank_count = [0] * 13
+
+            for card in accessible_cards:
+                if card.suit == suit:
+                    rank_count[card.rank - 1] += 1
+
+            if all(count >= 2 for count in rank_count):
+                full_sequence_count += 2
+            elif all(count >= 1 for count in rank_count):
+                full_sequence_count += 1
+
+        return full_sequence_count
 
 
 class SpiderSolitaire:

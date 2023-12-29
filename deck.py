@@ -24,6 +24,9 @@ class Card:
         """Check if the given card can be stacked on this card"""
         return self.rank == (card.rank + 1)
 
+    def can_sequence(self, card: "Card") -> bool:
+        return self.can_stack(card) and self.same_suit(card)
+
     def same_suit(self, card: "Card") -> bool:
         """Check if this card has the same suit as the given card"""
         return self.suit == card.suit

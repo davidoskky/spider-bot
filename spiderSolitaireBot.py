@@ -113,7 +113,7 @@ class SpiderSolitaireBot:
                 break
 
             cycle += 1
-            print(f"Completed cycle {cycle}")
+            print(f"Completed cycle {cycle} - Current Score: {current_score}")
 
     def play_heuristic_old(self, weights=DEFAULT_WEIGHTS):
         moves = True

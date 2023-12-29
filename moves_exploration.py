@@ -7,22 +7,25 @@ if TYPE_CHECKING:
 
 
 DEFAULT_WEIGHTS = {
-    "visible_card_weight": 129.31059791,
-    "hidden_card_weight": 87.0175388,
-    "breaking_stackable_weight": -369.45669462,
+    "visible_card_weight": 10.31059791,
+    "hidden_card_weight": 10.0175388,
+    "breaking_stackable_weight": 69.45669462,
     "breaking_sequence_weight": 138.15459622,
-    "empty_stack_weight": 3000.2845636,
-    "count_completed_stacks": 10000.70034362,
-    "sequence_length_weight": 359.84705868,
+    "empty_stack_weight": 4000.2845636,
+    "semi_empty_stacks": 4000.2845636,
+    "count_blocked_stacks": -500,
+    "count_completed_stacks": 100000,
+    "count_accessible_full_sequences": 500,
+    "sequence_length_weight": 200.84705868,
     "stacked_length_weight": 65.9502677,
-    "total_rank_sequence_weight": 179.44314697,
-    "total_rank_stacked_weight": -327.68215433,
-    "stacked_length_indicator": 179.52688487,
-    "sequence_length_indicator": 340.70034362,
+    "total_rank_sequence_weight": 40,
+    "total_rank_stacked_weight": 20,
+    "stacked_length_indicator": 2.52688487,
+    "sequence_length_indicator": 5,
 }
 
 
-def score_board(board, weights) -> int:
+def score_board(board: Board, weights) -> int:
     """
     Evaluate and score the board state based on various criteria.
 
@@ -32,31 +35,75 @@ def score_board(board, weights) -> int:
     """
     score: int = 0
 
-    score += weights["visible_card_weight"] * board.count_visible_cards()
+    visible_card_score = weights["visible_card_weight"] * board.count_visible_cards()
+    score += visible_card_score
 
-    score -= weights["hidden_card_weight"] * board.count_hidden_cards()
+    hidden_card_score = -weights["hidden_card_weight"] * board.count_hidden_cards()
+    score += hidden_card_score
 
-    score -= (
-        weights["breaking_stackable_weight"] * board.count_cards_breaking_stackable()
+    breaking_stackable_score = (
+        -weights["breaking_stackable_weight"] * board.count_cards_breaking_stackable()
     )
+    score += breaking_stackable_score
 
-    score -= weights["breaking_sequence_weight"] * board.count_cards_breaking_sequence()
+    breaking_sequence_score = (
+        -weights["breaking_sequence_weight"] * board.count_cards_breaking_sequence()
+    )
+    score += breaking_sequence_score
 
-    score += weights["empty_stack_weight"] * board.count_empty_stacks()
+    empty_stack_score = weights["empty_stack_weight"] * board.count_empty_stacks()
+    score += empty_stack_score
 
-    score += weights["sequence_length_weight"] * sum(board.stacks_sequence_lengths())
+    accessible_full_sequences_score = (
+        weights["count_accessible_full_sequences"]
+        * board.count_accessible_full_sequences()
+    )
+    score += accessible_full_sequences_score
 
-    score += weights["stacked_length_weight"] * sum(board.stacks_stacked_lengths())
+    semi_empty_stack_score = (
+        weights["semi_empty_stacks"] * board.count_semi_empty_stacks()
+    )
+    score += semi_empty_stack_score
 
-    score += weights["total_rank_sequence_weight"] * board.total_rank_sequence_cards()
+    blocked_stacks_score = (
+        weights["count_blocked_stacks"] * board.count_blocked_stacks()
+    )
+    score += blocked_stacks_score
 
-    score += weights["total_rank_stacked_weight"] * board.total_rank_stacked_cards()
+    sequence_length_score = weights["sequence_length_weight"] * sum(
+        board.stacks_sequence_lengths()
+    )
+    score += sequence_length_score
 
-    score += weights["stacked_length_indicator"] * board.stacked_length_indicator()
+    stacked_length_score = weights["stacked_length_weight"] * sum(
+        board.stacks_stacked_lengths()
+    )
+    score += stacked_length_score
 
-    score += weights["sequence_length_indicator"] * board.sequence_length_indicator()
+    total_rank_sequence_score = (
+        weights["total_rank_sequence_weight"] * board.total_rank_sequence_cards()
+    )
+    score += total_rank_sequence_score
 
-    score += weights["count_completed_stacks"] * board.count_completed_stacks()
+    total_rank_stacked_score = (
+        weights["total_rank_stacked_weight"] * board.total_rank_stacked_cards()
+    )
+    score += total_rank_stacked_score
+
+    stacked_length_indicator_score = (
+        weights["stacked_length_indicator"] * board.stacked_length_indicator()
+    )
+    score += stacked_length_indicator_score
+
+    sequence_length_indicator_score = (
+        weights["sequence_length_indicator"] * board.sequence_length_indicator()
+    )
+    score += sequence_length_indicator_score
+
+    completed_stacks_score = (
+        weights["count_completed_stacks"] * board.count_completed_stacks()
+    )
+    score += completed_stacks_score
 
     return score
 
@@ -162,7 +209,11 @@ def find_progressive_actions(board: Board):
     )
 
 
+# TODO: Easy optimization check there is at least one end of accessible stack which can accomodate one movable start of stack and make sequence
 def find_improved_equivalent_position(board: Board):
+    if not _identify_plausible_improved_equivalent_positions(board):
+        return []
+
     initial_sequence_length = board.sequence_length_indicator()
     initial_completed_stacks = board.count_completed_stacks()
 
@@ -172,7 +223,41 @@ def find_improved_equivalent_position(board: Board):
             board, initial_sequence_length
         )
         or is_more_completed_stacks(board, initial_completed_stacks),
-        max_depth=7,
+        max_depth=6,
+    )
+
+
+def _identify_plausible_improved_equivalent_positions(board: Board) -> bool:
+    """
+    Determine if there are any plausible moves on the board that could lead to an improved position.
+
+    This function analyzes each stack on the board, identifying the initial and final ranks
+    of the sequences within each stack. It then checks if a card from one sequence (based on its rank)
+    can be moved to the end of another sequence. This is a potential move that could lead to an
+    improved board position.
+
+    :param board: The current state of the Spider Solitaire game board.
+    :return: True if there is at least one plausible move that could improve the board position, False otherwise.
+    """
+    potential_movable_cards = set()
+    potential_destination_cards = set()
+
+    for stack in board.stacks:
+        sequences = stack.get_all_sequences()
+
+        if sequences:
+            if stack.first_accessible_sequence == 0:
+                potential_movable_cards.add(sequences[0][0])
+
+            for i, sequence in enumerate(sequences):
+                if i != 0:
+                    potential_movable_cards.add(sequence[0])
+                potential_destination_cards.add(sequence[-1])
+
+    return any(
+        destination.can_sequence(movable)
+        for destination in potential_destination_cards
+        for movable in potential_destination_cards
     )
 
 
