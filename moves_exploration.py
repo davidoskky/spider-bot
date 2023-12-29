@@ -158,7 +158,7 @@ def find_progressive_actions(board: Board):
         or is_fewer_hidden_cards_condition(board, hidden_cards)
         or is_more_visible_cards_condition(board, visible_cards)
         or is_more_completed_stacks(board, initial_completed_stacks),
-        max_depth=8,
+        max_depth=6,
     )
 
 
@@ -172,7 +172,7 @@ def find_improved_equivalent_position(board: Board):
             board, initial_sequence_length
         )
         or is_more_completed_stacks(board, initial_completed_stacks),
-        max_depth=8,
+        max_depth=7,
     )
 
 
@@ -210,7 +210,7 @@ def find_moves_freeing_covered_cards(board: Board):
         loss_condition=lambda board: is_fewer_hidden_cards_condition(
             board, hidden_cards
         ),
-        max_depth=8,
+        max_depth=4,
     )
 
 
