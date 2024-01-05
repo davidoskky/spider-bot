@@ -7,20 +7,20 @@ if TYPE_CHECKING:
 
 
 DEFAULT_WEIGHTS = {
-    "visible_card_weight": 10.31059791,
-    "hidden_card_weight": 10.0175388,
-    "breaking_stackable_weight": 69.45669462,
-    "breaking_sequence_weight": 138.15459622,
-    "empty_stack_weight": 4000.2845636,
-    "semi_empty_stacks": 4000.2845636,
+    "visible_card_weight": 10,
+    "hidden_card_weight": 10,
+    "breaking_stackable_weight": 69,
+    "breaking_sequence_weight": 138,
+    "empty_stack_weight": 4000,
+    "semi_empty_stacks": 4000,
     "count_blocked_stacks": -500,
     "count_completed_stacks": 100000,
-    "count_accessible_full_sequences": 500,
-    "sequence_length_weight": 200.84705868,
-    "stacked_length_weight": 65.9502677,
+    "count_accessible_full_sequences": 4000,
+    "sequence_length_weight": 200,
+    "stacked_length_weight": 65,
     "total_rank_sequence_weight": 40,
     "total_rank_stacked_weight": 20,
-    "stacked_length_indicator": 2.52688487,
+    "stacked_length_indicator": 2,
     "sequence_length_indicator": 5,
 }
 
@@ -143,12 +143,9 @@ def bfs_first_path(
         if max_depth is not None and len(current_path) >= max_depth:
             continue
 
-        for move in current_board.list_available_moves():
-            if len(move) == 3:
-                move = Move(*move)
-                if not current_board.is_move_indifferent(move):
-                    continue
-                queue.append(_simulate_move(current_board, move, current_path))
+        # Use only moves indifferent to the board state which don't change freedom
+        for move in current_board.list_indifferent_moves():
+            queue.append(_simulate_move(current_board, move, current_path))
 
     return []
 
@@ -209,7 +206,6 @@ def find_progressive_actions(board: Board):
     )
 
 
-# TODO: Easy optimization check there is at least one end of accessible stack which can accomodate one movable start of stack and make sequence
 def find_improved_equivalent_position(board: Board):
     if not _identify_plausible_improved_equivalent_positions(board):
         return []
@@ -227,6 +223,8 @@ def find_improved_equivalent_position(board: Board):
     )
 
 
+# TODO: This is not correct it should be sequence length can be increased and consider
+# like 9 - 8 - 7 - 6 and 6 - 5 - 4 - 3 - 2 - 1 can still be merged even though 6 cannot sequence 6
 def _identify_plausible_improved_equivalent_positions(board: Board) -> bool:
     """
     Determine if there are any plausible moves on the board that could lead to an improved position.
@@ -243,7 +241,7 @@ def _identify_plausible_improved_equivalent_positions(board: Board) -> bool:
     potential_destination_cards = set()
 
     for stack in board.stacks:
-        sequences = stack.get_all_sequences()
+        sequences = stack.get_accessible_sequences()
 
         if sequences:
             if stack.first_accessible_sequence == 0:
@@ -262,21 +260,61 @@ def _identify_plausible_improved_equivalent_positions(board: Board) -> bool:
 
 
 def find_move_increasing_stacked_length(board: Board):
+    # if not _identify_plausible_increasing_stacked(board):
+    #    return []
+
     initial_sequence_length = board.sequence_length_indicator()
     initial_stacked_length = board.stacked_length_indicator()
+    initial_empty_stacks = board.count_empty_stacks()
 
     def win_condition_with_logging(board):
         more_stacked = is_more_stacked_length(board, initial_stacked_length)
         less_sequence = is_less_sequence_length_indicator(
             board, initial_sequence_length
         )
-        win_condition = more_stacked and not less_sequence
+        more_empty = is_more_empty_stacks(board, initial_empty_stacks)
+        win_condition = (more_stacked or more_empty) and not less_sequence
         return win_condition
 
     return bfs_first_path(
         board,
         win_condition=win_condition_with_logging,
         max_depth=5,
+    )
+
+
+# TODO: Improve this as well
+def _identify_plausible_increasing_stacked(board: Board) -> bool:
+    """
+    Determine if there are any plausible moves on the board that could lead to an improved position.
+
+    This function analyzes each stack on the board, identifying the initial and final ranks
+    of the sequences within each stack. It then checks if a card from one sequence (based on its rank)
+    can be moved to the end of another sequence. This is a potential move that could lead to an
+    improved board position.
+
+    :param board: The current state of the Spider Solitaire game board.
+    :return: True if there is at least one plausible move that could improve the board position, False otherwise.
+    """
+    potential_movable_cards = set()
+    potential_destination_cards = set()
+
+    for stack in board.stacks:
+        sequences = stack.get_accessible_sequences()
+
+        if sequences:
+            if stack.first_accessible_sequence == 0:
+                potential_movable_cards.add(sequences[0][0])
+
+            for i, sequence in enumerate(sequences):
+                if i != 0:
+                    potential_movable_cards.add(sequence[0])
+                potential_destination_cards.add(sequence[-1])
+
+    return any(
+        destination.can_stack(movable)
+        for destination in potential_destination_cards
+        for movable in potential_destination_cards
     )
 
 

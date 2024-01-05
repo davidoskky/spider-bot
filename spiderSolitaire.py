@@ -1,5 +1,6 @@
 from operator import is_
 from typing import Optional
+
 from deck import Deck, SimpleDeck, Card
 import copy
 from moves_exploration import Move, find_progressive_actions
@@ -10,7 +11,7 @@ class Stack:
     Represents a stack of cards in Spider Solitaire.
     """
 
-    def __init__(self, cards):
+    def __init__(self, cards: list[Card]):
         self.cards = cards
         self.first_visible_card = len(cards) - 1
         self.first_accessible_sequence = self.first_card_of_valid_sequence()
@@ -148,7 +149,7 @@ class Stack:
         all_stacked_sequences.append(current_sequence)
         return all_stacked_sequences
 
-    def get_all_sequences(self):
+    def get_visible_sequences(self):
         """
         Generate a list of lists, where each inner list contains the cards in a valid stacked sequence
         from each stack on the board.
@@ -172,6 +173,31 @@ class Stack:
                 current_sequence = [cards[i]]
 
         all_stacked_sequences.append(current_sequence)
+        return all_stacked_sequences
+
+    def get_accessible_sequences(self):
+        """
+        Generate a list of lists, where each inner list contains the cards in a valid sequences
+        from each stack on the board.
+
+        This function iterates through each stack on the board, examining the stacked cards.
+        It creates a list for each valid stacked sequence and adds these lists to an outer list.
+
+        :return: A list of lists, each containing the cards in a valid stacked sequence.
+        """
+        all_stacked_sequences = []
+
+        cards = self.get_stacked()
+        if cards:
+            current_sequence = [cards[0]]
+            for i in range(1, len(cards)):
+                if cards[i - 1].can_sequence(cards[i]):
+                    current_sequence.append(cards[i])
+                else:
+                    all_stacked_sequences.append(current_sequence)
+                    current_sequence = [cards[i]]
+
+            all_stacked_sequences.append(current_sequence)
         return all_stacked_sequences
 
 
@@ -304,17 +330,30 @@ class Board:
         return moves
 
     def _get_valid_moves_to_other_stacks(self, from_index, card_index):
-        """Get all valid moves of one cart in one stack to other stacks."""
-        return [
-            (from_index, to_index, card_index)
-            for to_index, to_stack in enumerate(self.stacks)
-            if from_index != to_index
-            and self.is_valid_move(self.stacks[from_index], to_stack, card_index)
-        ]
+        """Get all valid moves of one cart in one stack to other stacks. For optimization reasons only one empty stack is listed"""
+        used_empty_stack = False
+        valid_moves = []
+        for to_index, to_stack in enumerate(self.stacks):
+            move = Move(from_index, to_index, card_index)
+            if used_empty_stack and to_stack.is_empty():
+                continue
+            if to_stack.is_empty():
+                used_empty_stack = True
+            if self.is_valid_move(self.stacks[from_index], to_stack, card_index):
+                valid_moves.append(move)
+        return valid_moves
 
     def _list_deck_moves(self):
         """List moves related to the deck, if any."""
         return [("draw_from_deck",)] if self.deck.cards else []
+
+    def list_indifferent_moves(self) -> list[Move]:
+        available_moves = self._list_stack_to_stack_moves()
+        indifferent_moves = []
+        for move in available_moves:
+            if self.is_move_indifferent(move):
+                indifferent_moves.append(move)
+        return indifferent_moves
 
     def is_move_indifferent(self, move: Move) -> bool:
         """
@@ -349,11 +388,12 @@ class Board:
 
     def get_state(self):
         """Return the current game state as a list of lists (each list represents a stack)."""
-        state = []
-        state.append(len(self.deck.cards))
+        # Using a set should give the same hash when we just move a sequence from one empty stack to another empty one
+        state = set()
+        state.add(len(self.deck.cards))
         for stack in self.stacks:
             stack_representation = tuple(card.encode() for card in stack.cards)
-            state.append(stack_representation)
+            state.add(stack_representation)
 
         return tuple(state)
 
@@ -555,11 +595,7 @@ class Board:
         """
         full_sequence_count = 0
 
-        accessible_cards = []
-        for stack in self.stacks:
-            stacked_cards = stack.get_stacked()
-            if stacked_cards:
-                accessible_cards.extend(stacked_cards)
+        accessible_cards = self.get_accessible_cards()
 
         for suit in range(4):
             rank_count = [0] * 13
@@ -574,6 +610,14 @@ class Board:
                 full_sequence_count += 1
 
         return full_sequence_count
+
+    def get_accessible_cards(self) -> list[Card]:
+        accessible_cards = []
+        for stack in self.stacks:
+            stacked_cards = stack.get_stacked()
+            if stacked_cards:
+                accessible_cards.extend(stacked_cards)
+        return accessible_cards
 
 
 class SpiderSolitaire:
