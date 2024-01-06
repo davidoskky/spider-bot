@@ -175,7 +175,7 @@ class Stack:
         all_stacked_sequences.append(current_sequence)
         return all_stacked_sequences
 
-    def get_accessible_sequences(self):
+    def get_accessible_sequences(self) -> list[list[Card]]:
         """
         Generate a list of lists, where each inner list contains the cards in a valid sequences
         from each stack on the board.
@@ -723,3 +723,5 @@ class SimpleSpiderSolitaire(SpiderSolitaire):
             stack_cards = self.deck.draw(2)
             stack_cards += self.deck.draw(1)
             self.stacks.append(Stack(stack_cards))
+
+        self.board = Board(deck=self.deck, stacks=self.stacks)
