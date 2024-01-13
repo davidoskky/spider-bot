@@ -9,7 +9,7 @@ NUM_POSSIBLE_ACTIONS = 92  # 90 pile to pile + 1 drawing from deck
 class SpiderSolitaireEnv(gym.Env):
     def __init__(self):
         super(SpiderSolitaireEnv, self).__init__()
-        self.max_steps = 1000  # Maximum number of steps before truncating the episode
+        self.max_steps = 40  # Maximum number of steps before truncating the episode
         self.current_step = 0
 
         # Define the action and observation spaces
@@ -55,14 +55,14 @@ class SpiderSolitaireEnv(gym.Env):
     def step(self, action):
         self.current_step += 1
         info = {}  # Initialize an empty info dictionary
-        reward = -1
+        reward = 5
         truncated = False
 
         valid_action = self.execute_action(action)
 
         if action == 91:  # Reset game
             print("Game reset by the bot.")
-            reward = -500
+            reward = -4000
             info["game_interrupted"] = True
             done = True
             truncated = True
@@ -70,7 +70,7 @@ class SpiderSolitaireEnv(gym.Env):
 
         next_state = self.get_state()
         if not valid_action:
-            reward = -3
+            reward = -5
         elif self.game.just_completed_stack:
             reward = 500
         done = self.game.is_game_over()
@@ -84,7 +84,7 @@ class SpiderSolitaireEnv(gym.Env):
         if self.current_step >= self.max_steps:
             done = True  # End the episode due to too many steps
             truncated = True
-            reward = -1200
+            reward = 0#-1200
         return next_state, reward, done, truncated, info
 
     def render(self, mode="human"):

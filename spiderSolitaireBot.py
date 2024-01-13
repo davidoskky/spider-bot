@@ -66,7 +66,7 @@ class SpiderSolitaireBot:
 
     def play_heuristic(self, weights=DEFAULT_WEIGHTS, verbose=0):
         if verbose > 1:
-            os.system(f"mpv new-game.mp3")
+            os.system(f"mpv audio/new-game.mp3")
         current_score = score_board(self.game.board, weights)
         cycle = 0
 
@@ -116,10 +116,10 @@ class SpiderSolitaireBot:
                     print("No moves available.")
                     break
 
-                cycle += 1
-                if verbose > 1:
-                    audio = random.randint(1, 10)
-                    os.system(f"mpv new-move-{audio}.mp3")
+            cycle += 1
+            if verbose > 1:
+                audio = random.randint(1, 10)
+                os.system(f"mpv audio/new-move-{audio}.mp3")
             if verbose > 0:
                 print(f"Completed cycle {cycle} - Current Score: {current_score}")
 

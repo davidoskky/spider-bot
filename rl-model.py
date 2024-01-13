@@ -9,18 +9,18 @@ from spiderSolitaireEnv import SpiderSolitaireEnv
 env = SpiderSolitaireEnv()
 
 # Define the model
-# model = PPO(
-#    "MlpPolicy",
-#    env,
-#    verbose=1,
-#    ent_coef=0.001,
-#    learning_rate=0.0004
-#    policy_kwargs=dict(net_arch=[128, 128, 128, 128]),
-#    tensorboard_log="./tb_log/",
-# )
+#model = PPO(
+#  "MlpPolicy",
+#  env,
+#  verbose=1,
+#  #ent_coef=0.001,
+#  #learning_rate=0.0004,
+#  policy_kwargs=dict(net_arch=[128]*25),
+#  tensorboard_log="./tb_log/",
+#)
 model = PPO.load("ppo_spidersolitaire-2")
 model.set_env(env)
-model.learning_rate = 0.0004
+# model.learning_rate = 0.002
 # model.learning_rate = 0.05
 
 # Train the model
