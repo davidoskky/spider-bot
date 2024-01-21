@@ -21,6 +21,12 @@ def test_single_sequence_switch():
     assert can_switch_stacked_reversibly([[card1]], [], [], 1)
 
 
+def test_single_sequence_switch_no_dof():
+    # Test switching a single non-empty sequence with an empty sequence
+    card1 = Card(1, 1)
+    assert can_switch_stacked_reversibly([[card1]], [], [], 0)
+
+
 def test_impossible_switch_due_to_insufficient_dof():
     # Test a scenario where switch is not possible due to insufficient degrees of freedom
     card1 = Card(2, 1)

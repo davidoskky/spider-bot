@@ -59,6 +59,34 @@ class Stack:
             )
         )
 
+    def count_sequences_to_index(self, index: int) -> int:
+        """
+        Count the number of stacked sequences needed to reach a given index in a stack.
+
+        :param stack: The stack of cards.
+        :param index: The index of the card in the stack.
+        :return: The number of stacked sequences to reach the card at the given index.
+        """
+        if index < 0 or index >= len(self.cards):
+            raise ValueError("Index is out of range for the stack")
+
+        if self.is_empty():
+            return 0
+
+        all_stacked_sequences = self.get_all_stacked_sequences()
+        count = 0
+        current_index = len(self.cards) - 1
+
+        for sequence in reversed(all_stacked_sequences):
+            sequence_length = len(sequence)
+            if current_index - sequence_length < index:
+                count += 1
+                break
+            count += 1
+            current_index -= sequence_length
+
+        return count
+
     def visible_cards(self) -> list[Card]:
         return self.cards[self.first_visible_card :]
 
@@ -116,6 +144,14 @@ class Stack:
                 return i
         return 0
 
+    def is_stacked(self, card_index: int) -> bool:
+        """Returns if the given card index is in an accessible stacked sequence"""
+        return card_index >= self.first_card_of_valid_stacked()
+
+    def is_stacked_on_table(self):
+        """Returns if the first card of stacked sequence is on top of empty board"""
+        return self.first_card_of_valid_stacked() == 0
+
     def valid_stacked_length(self) -> int:
         return len(self.cards) - self.first_card_of_valid_stacked()
 
@@ -123,24 +159,24 @@ class Stack:
         "Gets all the cards in the first accessible stacked sequence"
         return self.cards[self.first_card_of_valid_stacked() :]
 
-    def get_all_stacked_sequences(self):
+    def get_all_stacked_sequences(self) -> list[list[Card]]:
         """
         Generate a list of lists, where each inner list contains the cards in a valid stacked sequence
-        from each stack on the board.
+        from each stack on the board. Ordered from the topmost sequence to the bottom.
 
         This function iterates through each stack on the board, examining the stacked cards.
         It creates a list for each valid stacked sequence and adds these lists to an outer list.
 
         :return: A list of lists, each containing the cards in a valid stacked sequence.
         """
-        all_stacked_sequences = []
+        all_stacked_sequences: list[list[Card]] = []
         if self.is_empty():
             return all_stacked_sequences
 
         cards = self.visible_cards()
         current_sequence = [cards[0]]
         for i in range(1, len(cards)):
-            if cards[i - 1].can_stack(cards[i]):
+            if current_sequence[-1].can_stack(cards[i]):
                 current_sequence.append(cards[i])
             else:
                 all_stacked_sequences.append(current_sequence)
@@ -342,6 +378,12 @@ class Board:
             if self.is_valid_move(self.stacks[from_index], to_stack, card_index):
                 valid_moves.append(move)
         return valid_moves
+
+    def get_empty_stack_id(self):
+        for id, stack in enumerate(self.stacks):
+            if stack.is_empty():
+                return id
+        return -1
 
     def _list_deck_moves(self):
         """List moves related to the deck, if any."""

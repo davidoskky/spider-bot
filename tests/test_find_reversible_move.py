@@ -1,4 +1,3 @@
-import re
 import pytest
 from moves_exploration import search_for_beneficial_reversible_move
 from spiderSolitaire import Board, Stack

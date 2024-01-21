@@ -435,7 +435,9 @@ def _identify_plausible_increasing_stacked(board: Board) -> bool:
     )
 
 
-def can_move_stacked_reversibly(stacked_cards, stacks, empty_stacks=0):
+def can_move_stacked_reversibly(
+    stacked_cards, stacks: list[Stack], empty_stacks=0, strict=False
+):
     """
     Determine if stacked card sequences can be moved reversibly given the empty stacks.
 
@@ -444,12 +446,14 @@ def can_move_stacked_reversibly(stacked_cards, stacks, empty_stacks=0):
     :param empty_stacks: Number of empty stacks available on the board.
     :return: True if the sequences can be moved reversibly, False otherwise.
     """
-    top_cards = [stack.top_card for stack in stacks if not stack.is_empty()]
+    top_cards = [stack.top_card() for stack in stacks if not stack.is_empty()]
     degrees_of_freedom = degrees_of_freedom_for_empty_stacks(empty_stacks)
-    return (
-        dof_to_move_stacked_reversibly(stacked_cards, top_cards)[0]
-        <= degrees_of_freedom
+    max_dof_required, used_stacks = dof_to_move_stacked_reversibly(
+        stacked_cards, top_cards
     )
+    if strict:
+        return used_stacks == 0
+    return max_dof_required <= degrees_of_freedom
 
 
 def degrees_of_freedom_for_empty_stacks(empty_stacks: int) -> int:
@@ -593,6 +597,316 @@ def dof_to_move_stacked_reversibly(
         max_dof_used = max(max_dof_used, current_dof_used)
 
     return max_dof_used, min(1, current_dof_used)
+
+
+def move_stack_to_temporary_position(
+    board: Board,
+    stack_id,
+    card_index,
+    empty_stacks_to_leave,
+    ignored_stacks: list[int] = [],
+):
+    """
+    Attempts to move a stack to a temporary position.
+
+    :param stack: The stack of cards to move.
+    :param empty_stacks: Total number of available empty stacks.
+    :param empty_stacks_to_leave: Number of empty stacks to leave after the move.
+    :return: A tuple (bool, list, int), where the first element is a boolean indicating if the move is possible,
+             the second is a list of moves, and the third is the number of empty stacks remaining.
+    """
+    cloned_board = board.clone()
+    current_empty_stacks = cloned_board.count_empty_stacks()
+    stack_to_move = cloned_board.stacks[stack_id]
+
+    sequences_to_move = stack_to_move.count_sequences_to_index(card_index)
+    moves: list[Move] = []
+
+    if sequences_to_move > current_empty_stacks - empty_stacks_to_leave:
+        # TODO: Implement more complex behaviors
+        return moves
+
+    for sequence_index in range(sequences_to_move):
+        # Move each sequence to an empty stack
+        # This is a conceptual representation; actual move logic will depend on game's rules
+        move = Move(
+            stack_id,
+            cloned_board.get_empty_stack_id(),
+            stack_to_move.first_card_of_valid_sequence(),
+        )
+        moves.append(move)
+        cloned_board.move_by_index(*move)
+        current_empty_stacks -= 1
+
+    return moves
+
+
+def free_stack(board: Board, ignored_stacks: list[int] = []):
+    cloned_board = board.clone()
+    moves: list[Move] = []
+    available_dof = degrees_of_freedom_for_empty_stacks(
+        cloned_board.count_empty_stacks()
+    )
+    initial_empty_stacks = cloned_board.count_empty_stacks()
+
+    stack_to_free_id = _select_stack_to_free(cloned_board, ignored_stacks)
+    if stack_to_free_id == -1:
+        logging.debug(f"free_stack: No stack can be freed")
+        return moves
+
+    print(f"Stack to free = {stack_to_free_id}")
+
+    stack_to_free = cloned_board.stacks[stack_to_free_id]
+    origin_stack_queue = deque()
+    target_stack_id = _find_stack_which_can_stack(
+        cloned_board, stack_to_free.cards[0], ignored_stacks
+    )
+
+    sequences = stack_to_free.get_accessible_sequences()
+
+    # If you can just move to empty stacks, do that as it is easier
+    # TODO: This is not the most optimal movement strategy
+    logging.debug(
+        f"free_stack: Amount of sequences to move: {len(sequences)}, DOF: {available_dof}"
+    )
+    if len(sequences) - 1 <= available_dof:
+        additional_moves = _move_card_to_no_intermediates(
+            cloned_board, stack_to_free_id, target_stack_id, 0
+        )
+
+        for move in additional_moves:
+            cloned_board.move_by_index(*move)
+            moves.append(move)
+        logging.debug(f"free_stack: Moves before recursion: {moves}")
+
+        while initial_empty_stacks >= cloned_board.count_empty_stacks():
+            additional_moves = free_stack(cloned_board, ignored_stacks)
+            for move in additional_moves:
+                moves.append(move)
+                cloned_board.move_by_index(*move)
+        return moves
+
+    for sequence in reversed(sequences):
+        origin_stack_queue.append(stack_to_free_id)
+
+    while origin_stack_queue:
+        position = origin_stack_queue.popleft()
+        card_id = cloned_board.stacks[position].first_card_of_valid_sequence()
+        first_card = cloned_board.stacks[position].cards[card_id]
+        move_to_stack_id = _find_stack_which_can_stack(cloned_board, first_card)
+
+        if cloned_board.stacks[target_stack_id].can_stack(first_card):
+            move = Move(position, target_stack_id, card_id)
+            cloned_board.move_by_index(*move)
+            moves.append(move)
+
+        elif move_to_stack_id != -1:
+            move = Move(position, move_to_stack_id, card_id)
+            cloned_board.move_by_index(*move)
+            moves.append(move)
+            origin_stack_queue.append(move_to_stack_id)
+
+        else:
+            empty_stack_id = cloned_board.get_empty_stack_id()
+            if empty_stack_id is not None:
+                move = Move(position, empty_stack_id, card_id)
+                cloned_board.move_by_index(*move)
+                moves.append(move)
+                origin_stack_queue.append(empty_stack_id)
+            else:
+                raise Warning(
+                    "Implementation error, trying to move something which should not be"
+                )
+
+        return moves
+
+
+def _move_card_to_no_intermediates(
+    board: Board, source_id, target_id, card_to_move
+) -> list[Move]:
+    """
+    Move a card to another stack reversibly, only if allowed by DoF directly with no intermediate exchanges.
+
+    :param board: The current state of the Spider Solitaire game.
+    :param source_id: ID of the source stack.
+    :param target_id: ID of the target stack.
+    :param card_id: ID of the card in the source stack to start moving from.
+    :return: List of Moves needed to perform the action.
+    """
+    moves: list[Move] = []
+    cloned_board = board.clone()
+    available_dof = degrees_of_freedom_for_empty_stacks(
+        cloned_board.count_empty_stacks()
+    )
+    source_stack = cloned_board.stacks[source_id]
+    sequences = cards_to_sequences(source_stack.cards[card_to_move:])
+    logging.debug(f"_move_card_to_no_intermediates: sequences = {sequences}")
+
+    if not source_stack.is_stacked(card_to_move) or len(sequences) - 1 > available_dof:
+        return moves
+
+    if len(sequences) > 1:
+        stack_to_stack_moves = optimal_stacked_reversible_movement(
+            cloned_board, source_id, len(sequences) - 1
+        )
+        for move_set in stack_to_stack_moves:
+            start, dest = move_set
+            card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+            move = Move(start, dest, card_id)
+            cloned_board.move_by_index(*move)
+            moves.append(move)
+
+    move = Move(source_id, target_id, card_to_move)
+    moves.append(move)
+    return moves
+
+
+def optimal_stacked_reversible_movement(
+    board: Board,
+    source_stack_id: int,
+    amount_of_sequences: int,
+):
+    """
+    Generates an optimal sequence of moves to free one stack given a number of empty stacks,
+    ensuring that the number of moves starting from the source stack matches the amount of sequences.
+    It does not consider moving cads on top of others, it only uses the empty stacks.
+
+    :param board: The current state of the Spider Solitaire game.
+    :param source_stack_id: ID of the source stack from which cards are to be moved.
+    :param amount_of_sequences: Number of sequences in the source stack to be moved.
+    :return: List of tuples representing the moves, where each tuple is (source_stack_id, target_stack_id).
+    """
+    initial_empty_stacks = board.count_empty_stacks()
+    empty_stacks = [id for id, stack in enumerate(board.stacks) if stack.is_empty()]
+    moves: list[tuple[int, int]] = []
+
+    if initial_empty_stacks == 0:
+        return moves
+    if initial_empty_stacks == 1:
+        moves.append((source_stack_id, empty_stacks[0]))
+    if initial_empty_stacks == 2:
+        moves.append((source_stack_id, empty_stacks[0]))
+        if amount_of_sequences == 1:
+            return moves
+        moves.append((source_stack_id, empty_stacks[1]))
+        if amount_of_sequences == 2:
+            return moves
+        moves.append((empty_stacks[0], empty_stacks[1]))
+        moves.append((source_stack_id, empty_stacks[0]))
+    if initial_empty_stacks >= 3:
+        moves.append((source_stack_id, empty_stacks[0]))
+        if amount_of_sequences == 1:
+            return moves
+        moves.append((source_stack_id, empty_stacks[1]))
+        if amount_of_sequences == 2:
+            return moves
+        moves.append((source_stack_id, empty_stacks[2]))
+        if amount_of_sequences == 3:
+            return moves
+        moves.append((empty_stacks[0], empty_stacks[1]))
+        moves.append((source_stack_id, empty_stacks[0]))
+        if amount_of_sequences == 4:
+            return moves
+        moves.append((empty_stacks[2], empty_stacks[0]))
+        moves.append((empty_stacks[1], empty_stacks[2]))
+        moves.append((empty_stacks[1], empty_stacks[0]))
+        moves.append((source_stack_id, empty_stacks[1]))
+        if amount_of_sequences == 5:
+            return moves
+        moves.append((empty_stacks[2], empty_stacks[0]))
+        moves.append((source_stack_id, empty_stacks[2]))
+        if amount_of_sequences == 6:
+            return moves
+        moves.append((empty_stacks[1], empty_stacks[2]))
+        moves.append((source_stack_id, empty_stacks[1]))
+
+    return moves
+
+
+def cards_to_sequences(cards: list[Card]) -> list[list[Card]]:
+    """Takes a list of cards and returns a list of sequences"""
+    sequences: list[list[Card]] = []
+    if not cards:
+        return sequences
+    current_sequence: list[Card] = [cards[0]]
+    for card in cards[1:]:
+        if current_sequence[-1].can_sequence(card):
+            current_sequence.append(card)
+        else:
+            sequences.append(current_sequence)
+            current_sequence = [card]
+    if current_sequence:
+        sequences.append(current_sequence)
+
+    return sequences
+
+
+def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int:
+    highest_rank = -1
+    selected_stack_id = -1
+    available_dof = degrees_of_freedom_for_empty_stacks(board.count_empty_stacks())
+    for id, stack in enumerate(board.stacks):
+        if id in ignored_stacks or stack.is_empty() or not stack.is_stacked_on_table():
+            continue
+
+        rank = stack.cards[0].rank
+        if rank <= highest_rank:
+            continue
+
+        cards_to_move = stack.cards
+        if not cards_to_move:
+            continue
+
+        stacks_to_consider = [
+            cid
+            for cid, other_stack in enumerate(board.stacks)
+            if cid != id and not cid in ignored_stacks and not other_stack.is_empty()
+        ]
+        for dest in stacks_to_consider:
+            if not board.stacks[dest].can_stack(cards_to_move[0]):
+                continue
+
+            dof_needed, _ = dof_to_move_stacked_reversibly(
+                cards_to_sequences(cards_to_move),
+                get_uninvolved_top_cards(board, id, id),
+            )
+
+            if dof_needed <= available_dof:
+                highest_rank = rank
+                selected_stack_id = id
+    return selected_stack_id
+
+
+def _find_stack_which_can_stack(
+    board: Board, card: Card, ignored_stacks: list[int] = []
+) -> int:
+    target_stack = -1
+
+    for id, stack in enumerate(board.stacks):
+        if not id in ignored_stacks and not stack.is_empty():
+            if stack.can_stack(card):
+                target_stack = id
+                break
+
+    return target_stack
+
+
+def find_stack_to_move_sequence(
+    board: Board, top_card: Card, ignored_stacks: list[int] = []
+):
+    """
+    Find a stack to which the sequence can be legally moved.
+
+    :param board: The current board state.
+    :param sequence: The sequence of cards to move.
+    :return: ID of the stack where the sequence can be moved, or None if not found.
+    """
+    for target_stack_id, target_stack in enumerate(board.stacks):
+        if target_stack_id in ignored_stacks:
+            continue
+        if target_stack.can_stack(top_card):
+            return target_stack_id
+    return None
 
 
 def find_moves_freeing_covered_cards(board: Board):
