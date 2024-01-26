@@ -317,7 +317,7 @@ def _check_for_reversible_move(
                     source_seq_index,
                     source_sequences,
                 )
-                top_cards = get_uninvolved_top_cards(board, source_index, target_index)
+                top_cards = get_top_cards(board, [source_index, target_index])
                 logging.debug(
                     f"find_reversible_move: merged_sequence = {repr(merged_sequence)}"
                 )
@@ -356,6 +356,14 @@ def get_uninvolved_top_cards(board: Board, source_index: int, target_index: int)
         stack.top_card()
         for i, stack in enumerate(board.stacks)
         if i not in [source_index, target_index] and not stack.is_empty()
+    ]
+
+
+def get_top_cards(board: Board, ignored_stacks: list[int]):
+    return [
+        stack.top_card()
+        for i, stack in enumerate(board.stacks)
+        if i not in ignored_stacks and not stack.is_empty()
     ]
 
 
@@ -599,6 +607,26 @@ def dof_to_move_stacked_reversibly(
     return max_dof_used, min(1, current_dof_used)
 
 
+def find_partially_stackable(
+    board: Board, sequence: list[Card], ignored_stacks: list[int]
+) -> tuple[int, int] | None:
+    for stack_index, stack in enumerate(board.stacks):
+        if stack_index in ignored_stacks or stack.is_empty():
+            continue
+
+        top_card = stack.top_card()
+        for sequence_index, element in enumerate(
+            sequence[1:], start=1
+        ):  # start=1 to skip the top card
+            if top_card.can_stack(element):
+                return (
+                    stack_index,
+                    sequence_index,
+                )
+
+    return None
+
+
 def move_stack_to_temporary_position(
     board: Board,
     stack_id,
@@ -654,7 +682,7 @@ def free_stack(board: Board, ignored_stacks: list[int] = []):
         logging.debug(f"free_stack: No stack can be freed")
         return moves
 
-    print(f"Stack to free = {stack_to_free_id}")
+    logging.debug(f"Stack to free = {stack_to_free_id}")
 
     stack_to_free = cloned_board.stacks[stack_to_free_id]
     target_stack_id = _find_stack_which_can_stack(
@@ -666,9 +694,7 @@ def free_stack(board: Board, ignored_stacks: list[int] = []):
     # If you can just move to empty stacks, do that as it is easier
     # TODO: This is not the most optimal movement strategy
     length_considered_sequence = 0
-    top_cards = get_uninvolved_top_cards(
-        cloned_board, stack_to_free_id, stack_to_free_id
-    )
+    top_cards = get_top_cards(cloned_board, [stack_to_free_id])
     if len(sequences) <= available_dof:
         moves = _move_card_to_no_intermediates(
             cloned_board, stack_to_free_id, target_stack_id, 0
@@ -683,7 +709,6 @@ def free_stack(board: Board, ignored_stacks: list[int] = []):
         can_move_without_splitting = True
         testing_board = board.clone()
         for current_seq_index, sequence in enumerate(reversed(sequences)):
-            print("Cycling")
             length_considered_sequence += 1
             temporary_stack_id = _find_stack_which_can_stack(
                 testing_board, sequence[0], ignored_stacks
@@ -719,8 +744,55 @@ def free_stack(board: Board, ignored_stacks: list[int] = []):
             cloned_board = testing_board
             moves = moves_no_split
         else:
-            # TODO: Find advantageous splitting sequence so that you can keep organizing
-            return []
+            moves_split: list[Move] = []
+            can_move_splitting = True
+            length_considered_sequence = 0
+            testing_board = board.clone()
+            stack_to_free = testing_board.stacks[stack_to_free_id]
+            for current_seq_index, sequence in enumerate(reversed(sequences)):
+                length_considered_sequence += 1
+                partially_stackable = find_partially_stackable(
+                    testing_board, sequence, ignored_stacks
+                )
+                logging.debug(
+                    f"free_stack: partially stackable = {partially_stackable}"
+                )
+                move_index = stack_to_free.cards.index(sequence[0])
+                if partially_stackable is not None:
+                    partial_moves = _move_card_to_no_intermediates(
+                        testing_board,
+                        stack_to_free_id,
+                        partially_stackable[0],
+                        stack_to_free.cards.index(sequence[partially_stackable[1]]),
+                    )
+                    if partial_moves:
+                        length_considered_sequence = 1
+                        moves_split.extend(partial_moves)
+                        for move in partial_moves:
+                            testing_board.move_by_index(*move)
+
+                        if len(sequences) - current_seq_index <= available_dof:
+                            break
+
+                        while testing_board.count_empty_stacks() < initial_empty_stacks:
+                            more_moves = free_stack(testing_board, ignored_stacks)
+                            moves_split.extend(more_moves)
+                            for move in more_moves:
+                                testing_board.move_by_index(*move)
+                    else:
+                        can_move_splitting = False
+                        break
+
+                if length_considered_sequence > available_dof:
+                    can_move_splitting = False
+                    break
+
+            if can_move_splitting:
+                cloned_board = testing_board
+                moves = moves_split
+
+    if not moves:
+        return []
 
     while cloned_board.count_empty_stacks() <= initial_empty_stacks:
         more_moves = free_stack(cloned_board, ignored_stacks)
@@ -882,7 +954,7 @@ def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int:
 
             dof_needed, _ = dof_to_move_stacked_reversibly(
                 cards_to_sequences(cards_to_move),
-                get_uninvolved_top_cards(board, id, id),
+                get_top_cards(board, [id]),
             )
 
             if dof_needed <= available_dof:
