@@ -657,7 +657,6 @@ def free_stack(board: Board, ignored_stacks: list[int] = []):
     print(f"Stack to free = {stack_to_free_id}")
 
     stack_to_free = cloned_board.stacks[stack_to_free_id]
-    origin_stack_queue = deque()
     target_stack_id = _find_stack_which_can_stack(
         cloned_board, stack_to_free.cards[0], ignored_stacks
     )
@@ -666,59 +665,70 @@ def free_stack(board: Board, ignored_stacks: list[int] = []):
 
     # If you can just move to empty stacks, do that as it is easier
     # TODO: This is not the most optimal movement strategy
-    logging.debug(
-        f"free_stack: Amount of sequences to move: {len(sequences)}, DOF: {available_dof}"
+    length_considered_sequence = 0
+    top_cards = get_uninvolved_top_cards(
+        cloned_board, stack_to_free_id, stack_to_free_id
     )
-    if len(sequences) - 1 <= available_dof:
-        additional_moves = _move_card_to_no_intermediates(
+    if len(sequences) <= available_dof:
+        moves = _move_card_to_no_intermediates(
             cloned_board, stack_to_free_id, target_stack_id, 0
         )
-
-        for move in additional_moves:
+        for move in moves:
             cloned_board.move_by_index(*move)
-            moves.append(move)
-        logging.debug(f"free_stack: Moves before recursion: {moves}")
 
-        while initial_empty_stacks >= cloned_board.count_empty_stacks():
-            additional_moves = free_stack(cloned_board, ignored_stacks)
-            for move in additional_moves:
-                moves.append(move)
-                cloned_board.move_by_index(*move)
-        return moves
-
-    for sequence in reversed(sequences):
-        origin_stack_queue.append(stack_to_free_id)
-
-    while origin_stack_queue:
-        position = origin_stack_queue.popleft()
-        card_id = cloned_board.stacks[position].first_card_of_valid_sequence()
-        first_card = cloned_board.stacks[position].cards[card_id]
-        move_to_stack_id = _find_stack_which_can_stack(cloned_board, first_card)
-
-        if cloned_board.stacks[target_stack_id].can_stack(first_card):
-            move = Move(position, target_stack_id, card_id)
-            cloned_board.move_by_index(*move)
-            moves.append(move)
-
-        elif move_to_stack_id != -1:
-            move = Move(position, move_to_stack_id, card_id)
-            cloned_board.move_by_index(*move)
-            moves.append(move)
-            origin_stack_queue.append(move_to_stack_id)
-
-        else:
-            empty_stack_id = cloned_board.get_empty_stack_id()
-            if empty_stack_id is not None:
-                move = Move(position, empty_stack_id, card_id)
-                cloned_board.move_by_index(*move)
-                moves.append(move)
-                origin_stack_queue.append(empty_stack_id)
-            else:
-                raise Warning(
-                    "Implementation error, trying to move something which should not be"
+    else:
+        # Find if just moving the sequences a solution is plausible
+        # If a solution is not plausible, you need to split the sequences
+        moves_no_split: list[Move] = []
+        can_move_without_splitting = True
+        testing_board = board.clone()
+        for current_seq_index, sequence in enumerate(reversed(sequences)):
+            print("Cycling")
+            length_considered_sequence += 1
+            temporary_stack_id = _find_stack_which_can_stack(
+                testing_board, sequence[0], ignored_stacks
+            )
+            move_index = stack_to_free.cards.index(sequence[0])
+            if temporary_stack_id != -1:
+                partial_moves = _move_card_to_no_intermediates(
+                    testing_board, stack_to_free_id, temporary_stack_id, move_index
                 )
+                if partial_moves:
+                    length_considered_sequence = 0
+                    moves_no_split.extend(partial_moves)
+                    for move in partial_moves:
+                        testing_board.move_by_index(*move)
 
-        return moves
+                    if len(sequences) - current_seq_index <= available_dof:
+                        break
+
+                    while testing_board.count_empty_stacks() < initial_empty_stacks:
+                        more_moves = free_stack(testing_board, ignored_stacks)
+                        moves_no_split.extend(more_moves)
+                        for move in more_moves:
+                            testing_board.move_by_index(*move)
+                else:
+                    can_move_without_splitting = False
+                    break
+
+            if length_considered_sequence > available_dof:
+                can_move_without_splitting = False
+                break
+
+        if can_move_without_splitting:
+            cloned_board = testing_board
+            moves = moves_no_split
+        else:
+            # TODO: Find advantageous splitting sequence so that you can keep organizing
+            return []
+
+    while cloned_board.count_empty_stacks() <= initial_empty_stacks:
+        more_moves = free_stack(cloned_board, ignored_stacks)
+        moves.extend(more_moves)
+        for move in more_moves:
+            cloned_board.move_by_index(*move)
+
+    return moves
 
 
 def _move_card_to_no_intermediates(
@@ -743,6 +753,9 @@ def _move_card_to_no_intermediates(
     logging.debug(f"_move_card_to_no_intermediates: sequences = {sequences}")
 
     if not source_stack.is_stacked(card_to_move) or len(sequences) - 1 > available_dof:
+        logging.debug(
+            f"_move_card_to_no_intermediates: Returning early as the input is invalid"
+        )
         return moves
 
     if len(sequences) > 1:
@@ -758,6 +771,7 @@ def _move_card_to_no_intermediates(
 
     move = Move(source_id, target_id, card_to_move)
     moves.append(move)
+    logging.debug(f"_move_card_to_no_intermediates: moves = {moves}")
     return moves
 
 
@@ -850,7 +864,7 @@ def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int:
             continue
 
         rank = stack.cards[0].rank
-        if rank <= highest_rank:
+        if rank <= highest_rank or rank == 14:
             continue
 
         cards_to_move = stack.cards
@@ -892,7 +906,7 @@ def _find_stack_which_can_stack(
 
 
 def find_stack_to_move_sequence(
-    board: Board, top_card: Card, ignored_stacks: list[int] = []
+    board: Board, top_card: Card, ignored_stacks: list[int] = [], ignore_empty=False
 ):
     """
     Find a stack to which the sequence can be legally moved.
@@ -903,6 +917,8 @@ def find_stack_to_move_sequence(
     """
     for target_stack_id, target_stack in enumerate(board.stacks):
         if target_stack_id in ignored_stacks:
+            continue
+        if ignore_empty and target_stack.is_empty():
             continue
         if target_stack.can_stack(top_card):
             return target_stack_id
