@@ -313,6 +313,10 @@ class Board:
             self.stacks[source_stack_id], self.stacks[destination_stack_id], card_index
         )
 
+    def execute_moves(self, moves: list[Move]):
+        for move in moves:
+            self.move_by_index(*move)
+
     def is_game_won(self) -> bool:
         """Check if the game has been won"""
         return not self.deck.cards and not any(stack.cards for stack in self.stacks)
