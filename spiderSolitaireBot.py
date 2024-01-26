@@ -7,6 +7,7 @@ from moves_exploration import (
     find_move_increasing_stacked_length,
     find_moves_freeing_covered_cards,
     find_progressive_actions,
+    free_stack,
     is_board_winnable,
     score_board,
 )
@@ -76,14 +77,15 @@ class SpiderSolitaireBot:
                 if verbose > 0:
                     print(description)
                     print(moves)
-                for move in moves:
-                    self.game.board.move_by_index(*move)
+                self.game.board.execute_moves(moves)
                 current_score = score_board(self.game.board, weights)
                 moves_made = True
 
         while True:
             self.game.display_game_state()
             moves_made = False
+
+            try_execute_moves(free_stack(self.game.board), "Free Stack")
 
             try_execute_moves(
                 find_improved_equivalent_position(self.game.board), "Improved"
