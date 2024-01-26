@@ -669,7 +669,7 @@ def move_stack_to_temporary_position(
     return moves
 
 
-def free_stack(board: Board, ignored_stacks: list[int] = []):
+def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
     cloned_board = board.clone()
     moves: list[Move] = []
     available_dof = degrees_of_freedom_for_empty_stacks(
@@ -693,8 +693,6 @@ def free_stack(board: Board, ignored_stacks: list[int] = []):
 
     # If you can just move to empty stacks, do that as it is easier
     # TODO: This is not the most optimal movement strategy
-    length_considered_sequence = 0
-    top_cards = get_top_cards(cloned_board, [stack_to_free_id])
     if len(sequences) <= available_dof:
         moves = _move_card_to_no_intermediates(
             cloned_board, stack_to_free_id, target_stack_id, 0
@@ -707,6 +705,7 @@ def free_stack(board: Board, ignored_stacks: list[int] = []):
         # If a solution is not plausible, you need to split the sequences
         moves_no_split: list[Move] = []
         can_move_without_splitting = True
+        length_considered_sequence = 0
         testing_board = board.clone()
         for current_seq_index, sequence in enumerate(reversed(sequences)):
             length_considered_sequence += 1
@@ -744,6 +743,7 @@ def free_stack(board: Board, ignored_stacks: list[int] = []):
             cloned_board = testing_board
             moves = moves_no_split
         else:
+            # Consider moves which require splits
             moves_split: list[Move] = []
             can_move_splitting = True
             length_considered_sequence = 0
