@@ -4,8 +4,6 @@ import logging
 from collections import deque
 from typing import TYPE_CHECKING, NamedTuple
 
-from matplotlib.style import available
-
 from deck import Card
 
 if TYPE_CHECKING:
