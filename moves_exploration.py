@@ -1,8 +1,11 @@
 from __future__ import annotations
-from collections import deque
+
 import logging
-from typing import NamedTuple, TYPE_CHECKING
+from collections import deque
+from typing import TYPE_CHECKING, NamedTuple
+
 from matplotlib.style import available
+
 from deck import Card
 
 if TYPE_CHECKING:
