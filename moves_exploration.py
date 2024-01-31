@@ -513,9 +513,7 @@ def can_switch_stacked_reversibly(
                 f"can_switch_staked_reversibly: both sequences are empty, return False"
             )
             return False
-        dof_needed, used_dof = dof_to_move_stacked_reversibly(
-            non_empty_sequence, top_cards
-        )
+        dof_needed, _ = dof_to_move_stacked_reversibly(non_empty_sequence, top_cards)
 
         logging.debug(f"can_switch_staked_reversibly: dof_needed = {dof_needed}")
         # Remove 1 degree of freedom because the other stack can stack the top card of the stacked sequence
@@ -999,7 +997,6 @@ def find_stack_to_move_sequence(
 
 
 def find_moves_freeing_covered_cards(board: Board):
-    empty_stacks = board.count_empty_stacks()
     cards_in_sequence = sum(board.stacks_sequence_lengths())
     breaking_stackable = board.count_cards_breaking_stackable()
     hidden_cards = board.count_hidden_cards()
