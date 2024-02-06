@@ -817,16 +817,26 @@ def move_card_to(board: Board, source_id, target_id, card_to_move) -> list[Move]
     """Produces a series of moves which lead to moving one specific card to another stack through reversible moves"""
     moves: list[Move] = []
     cloned_board = board.clone()
-    cards_to_move = cloned_board.stacks[source_id].cards[card_to_move:]
-    sequences = cards_to_sequences(cards_to_move)
-    degrees_of_freedom = dof_board(cloned_board)
 
-    if degrees_of_freedom >= len(sequences) - 1:
-        return _move_card_to_no_intermediates(
-            cloned_board, source_id, target_id, card_to_move
-        )
+    # Ensure the card to move is within the stack
+    if card_to_move >= len(cloned_board.stacks[source_id].cards):
+        return moves
 
-    else:
+    while True:
+        cards_to_move = cloned_board.stacks[source_id].cards[card_to_move:]
+        sequences = cards_to_sequences(cards_to_move)
+        degrees_of_freedom = dof_board(cloned_board)
+
+        # Move directly if degrees of freedom allow
+        if degrees_of_freedom >= len(sequences) - 1:
+            direct_moves = _move_card_to_no_intermediates(
+                cloned_board, source_id, target_id, card_to_move
+            )
+            moves.extend(direct_moves)
+            cloned_board.execute_moves(direct_moves)
+            break
+
+        reversible_moves = []
         moves_no_split = _reversible_move_away_from_stack(
             cloned_board,
             sequences,
@@ -836,7 +846,7 @@ def move_card_to(board: Board, source_id, target_id, card_to_move) -> list[Move]
             consider_split=False,
         )
         if moves_no_split:
-            moves = moves_no_split
+            reversible_moves = moves_no_split
         else:
             moves_split = _reversible_move_away_from_stack(
                 cloned_board,
@@ -847,32 +857,21 @@ def move_card_to(board: Board, source_id, target_id, card_to_move) -> list[Move]
                 consider_split=True,
             )
             if moves_split:
-                moves = moves_split
+                reversible_moves = moves_split
 
-    logging.debug(f"move_card_to: moves = {moves}")
-    if not moves:
-        return []
-
-    if len(moves) == 0:
-        logging.debug(f"move_card_to: No moves found in first iteration, returning")
-        return []
-
-    cloned_board.execute_moves(moves)
-    freeing_moves = free_stack(cloned_board, ignored_stacks=[source_id, target_id])
-    if freeing_moves:
-        moves.extend(freeing_moves)
-        cloned_board.execute_moves(freeing_moves)
-
-    logging.debug(
-        f"move_card_to: len cards: {len(cloned_board.stacks[source_id].cards)}"
-    )
-    # Degrees of freedom have to be reclaimed in a smarter way
-    while len(cloned_board.stacks[source_id].cards) > card_to_move + 1:
-        more_moves = move_card_to(cloned_board, source_id, target_id, card_to_move)
-        if not more_moves:
-            return []
-        moves.extend(more_moves)
-        cloned_board.execute_moves(more_moves)
+        if reversible_moves:
+            moves.extend(reversible_moves)
+            cloned_board.execute_moves(reversible_moves)
+        else:
+            # If no reversible moves are found, attempt to free up space
+            freeing_moves = free_stack(
+                cloned_board, ignored_stacks=[source_id, target_id]
+            )
+            if not freeing_moves:
+                moves = []
+                break
+            moves.extend(freeing_moves)
+            cloned_board.execute_moves(freeing_moves)
 
     return moves
 
