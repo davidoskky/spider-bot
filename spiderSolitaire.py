@@ -1,8 +1,8 @@
+import copy
 from operator import is_
 from typing import Optional
 
-from deck import Deck, SimpleDeck, Card
-import copy
+from deck import Card, Deck, SimpleDeck
 from moves_exploration import Move, find_progressive_actions
 
 
