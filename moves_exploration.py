@@ -465,6 +465,10 @@ def can_move_stacked_reversibly(
     return max_dof_required <= degrees_of_freedom
 
 
+def dof_board(board: Board):
+    return degrees_of_freedom_for_empty_stacks(board.count_empty_stacks())
+
+
 def degrees_of_freedom_for_empty_stacks(empty_stacks: int) -> int:
     """Calculate degrees of freedom based on empty stacks."""
     if empty_stacks < 0:
