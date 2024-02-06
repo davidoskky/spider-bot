@@ -612,7 +612,7 @@ def dof_to_move_stacked_reversibly(
 
 def find_partially_stackable(
     board: Board, sequence: list[Card], ignored_stacks: list[int]
-) -> tuple[int, int] | None:
+) -> tuple[int, int]:
     for stack_index, stack in enumerate(board.stacks):
         if stack_index in ignored_stacks or stack.is_empty():
             continue
@@ -627,7 +627,7 @@ def find_partially_stackable(
                     sequence_index,
                 )
 
-    return None
+    return (-1, -1)
 
 
 def move_stack_to_temporary_position(
