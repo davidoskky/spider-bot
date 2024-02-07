@@ -1,6 +1,7 @@
-from moves_exploration import can_move_stacked_reversibly, can_switch_stacked_reversibly
-from deck import Card
 import pytest
+
+from deck import Card
+from moves_exploration import can_switch_stacked_reversibly
 
 
 def test_empty_stacks():
