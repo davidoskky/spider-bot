@@ -630,46 +630,41 @@ def find_partially_stackable(
     return (-1, -1)
 
 
-def move_stack_to_temporary_position(
-    board: Board,
-    stack_id,
-    card_index,
-    empty_stacks_to_leave,
-    ignored_stacks: list[int] = [],
-):
+def move_stacked_to_temporary_position(
+    board: Board, stack_id: int, card_index: int
+) -> list[Move]:
     """
-    Attempts to move a stack to a temporary position.
+    Moves a card, along with any cards stacked on top of it, from the specified stack to a temporary stack.
+    This function is useful for clearing space or reorganizing cards within the game board.
 
-    :param stack: The stack of cards to move.
-    :param empty_stacks: Total number of available empty stacks.
-    :param empty_stacks_to_leave: Number of empty stacks to leave after the move.
-    :return: A tuple (bool, list, int), where the first element is a boolean indicating if the move is possible,
-             the second is a list of moves, and the third is the number of empty stacks remaining.
+    The function identifies a suitable temporary stack (if available) and moves the specified card and all cards above it
+    within the same stack to this temporary location. It is designed to assist in complex card movements where
+    intermediate steps are required to achieve the desired board configuration.
+
+    Parameters:
+    - board (Board): The current state of the game board, encapsulating all stacks and their cards.
+    - stack_id (int): The index of the stack from which the card and any cards above it are to be moved.
+    - card_index (int): The index of the card within the stack from which the movement begins. All cards above this
+      index, including the card at this index, are considered part of the move.
+
+    Returns:
+    - list[Move]: A list of 'Move' objects representing the steps required to relocate the specified card and any
+      cards stacked on top of it to a temporary stack. An empty list indicates that no suitable temporary stack
+      was found or that the movement is not possible due to game rules or board state.
+
+    Note:
+    - The function assumes that the board, stack IDs, and card indices are valid and does not perform extensive
+      validation checks.
+    - The choice of the temporary stack is determined by an internal strategy that may vary based on the board's
+      current state and the specific rules or constraints of the game being played.
     """
-    cloned_board = board.clone()
-    current_empty_stacks = cloned_board.count_empty_stacks()
-    stack_to_move = cloned_board.stacks[stack_id]
+    stack = board.get_stack(stack_id)
+    if card_index >= len(stack.cards):
+        return []  # Return an empty list if the card_index is out of bounds
 
-    sequences_to_move = stack_to_move.count_sequences_to_index(card_index)
-    moves: list[Move] = []
+    temporary_stack_id = find_stack_to_move_sequence(board, stack.cards[card_index])
 
-    if sequences_to_move > current_empty_stacks - empty_stacks_to_leave:
-        # TODO: Implement more complex behaviors
-        return moves
-
-    for sequence_index in range(sequences_to_move):
-        # Move each sequence to an empty stack
-        # This is a conceptual representation; actual move logic will depend on game's rules
-        move = Move(
-            stack_id,
-            cloned_board.get_empty_stack_id(),
-            stack_to_move.first_card_of_valid_sequence(),
-        )
-        moves.append(move)
-        cloned_board.move_by_index(*move)
-        current_empty_stacks -= 1
-
-    return moves
+    return move_card_to(board, stack_id, temporary_stack_id, card_index)
 
 
 def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
