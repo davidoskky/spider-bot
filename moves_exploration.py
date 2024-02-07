@@ -299,6 +299,61 @@ def search_for_beneficial_reversible_move(board: Board) -> bool:
     return False
 
 
+def move_cards_removing_interfering(
+    board: Board,
+    source_stack_id: int,
+    target_stack_id: int,
+    source_card_id: int,
+) -> list[Move]:
+    """
+    Relocates a card from a source stack to a destination stack within the game board. If the destination stack has
+    interfering cards on top of the intended placement position, those cards are temporarily moved to a different stack
+    to allow the relocation. The process only uses reversible moves.
+
+    Steps:
+    1. Determine the placement position for the card in the destination stack.
+    2. Temporarily relocate any interfering cards at the destination position to another stack.
+    3. Move the specified card to the identified position in the destination stack.
+
+    Parameters:
+    - game_board (Board): The current state of the game board.
+    - from_stack_index (int): The index of the stack from which the card is being moved.
+    - to_stack_index (int): The index of the stack to which the card is being moved.
+    - card_index (int): The index of the card within the source stack that is to be moved.
+
+    Returns:
+    - list[Move]: A list of Move objects representing the required actions to relocate the card, including any temporary
+      moves to clear interfering cards.
+    """
+    moves: list[Move] = []
+    cloned_board = board.clone()
+
+    target_stack = cloned_board.get_stack(target_stack_id)
+    source_stack = cloned_board.get_stack(source_stack_id)
+    moving_card = source_stack.cards[source_card_id]
+
+    target_card_id = find_placement_index_for_card(moving_card, target_stack)
+    logging.debug(f"move_cards_removing_interfering: target_card_id = {target_card_id}")
+    # Check if the card can be placed in the target stack
+    if target_card_id is None:
+        return moves
+
+    # Clear any cards covering the target position
+    clearance_moves = _move_stacked_to_temporary_position(
+        board, target_stack_id, target_card_id + 1
+    )
+    logging.debug(f"switch_stacked: clearance_moves = {clearance_moves}")
+    cloned_board.execute_moves(clearance_moves)
+
+    moves_to_complete_switch = move_card_to_top(
+        cloned_board, source_stack_id, target_stack_id, source_card_id
+    )
+    if moves_to_complete_switch:
+        moves.extend(clearance_moves)
+        moves.extend(moves_to_complete_switch)
+    return moves
+
+
 def _check_for_reversible_move(
     board, source_sequences, target_sequences, source_index, target_index, empty_stacks
 ):
@@ -630,7 +685,7 @@ def find_partially_stackable(
     return (-1, -1)
 
 
-def move_stacked_to_temporary_position(
+def _move_stacked_to_temporary_position(
     board: Board, stack_id: int, card_index: int
 ) -> list[Move]:
     """
@@ -664,7 +719,7 @@ def move_stacked_to_temporary_position(
 
     temporary_stack_id = find_stack_to_move_sequence(board, stack.cards[card_index])
 
-    return move_card_to(board, stack_id, temporary_stack_id, card_index)
+    return move_card_to_top(board, stack_id, temporary_stack_id, card_index)
 
 
 def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
@@ -685,7 +740,7 @@ def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
         cloned_board, stack_to_free.cards[0], ignored_stacks
     )
 
-    moves = move_card_to(board, stack_to_free_id, target_stack_id, 0)
+    moves = move_card_to_top(board, stack_to_free_id, target_stack_id, 0)
 
     logging.debug(f"free_stack: moves = {moves}")
     if not moves:
@@ -808,8 +863,8 @@ def _move_card_to_no_intermediates(
     return moves
 
 
-def move_card_to(board: Board, source_id, target_id, card_to_move) -> list[Move]:
-    """Produces a series of moves which lead to moving one specific card to another stack through reversible moves"""
+def move_card_to_top(board: Board, source_id, target_id, card_to_move) -> list[Move]:
+    """Produces a series of moves which lead to moving one specific card to the top of another stack through reversible moves"""
     moves: list[Move] = []
     cloned_board = board.clone()
 
@@ -998,8 +1053,12 @@ def find_placement_index_for_card(card: Card, stack: Stack) -> int | None:
              Returns None if there is no valid position for the card in this stack.
     """
     accessible_cards = stack.get_stacked()
+    logging.debug(
+        f"find_placement_index_for_card: accessible_cards = {accessible_cards}"
+    )
     if not accessible_cards:
-        return 0 if stack.is_empty() else None
+        logging.debug(f"find_placement_index_for_card: No accessible cards found")
+        return -1 if stack.is_empty() else None
 
     accessible_cards.reverse()
 
