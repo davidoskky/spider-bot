@@ -987,6 +987,29 @@ def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int:
     return selected_stack_id
 
 
+def find_placement_index_for_card(card: Card, stack: Stack) -> int | None:
+    """
+    Finds the position within a given stack where a card can be legally placed according to the game's stacking rules.
+    It considers only the visible and accessible cards.
+
+    :param card: The card object to be placed.
+    :param stack: The stack (list of card objects) in which to place the card.
+    :return: The position (index) in the stack where the card can be placed according to the stacking rules.
+             Returns None if there is no valid position for the card in this stack.
+    """
+    accessible_cards = stack.get_stacked()
+    if not accessible_cards:
+        return 0 if stack.is_empty() else None
+
+    accessible_cards.reverse()
+
+    for i, accessible_card in enumerate(accessible_cards):
+        if accessible_card.can_stack(card):
+            return len(stack.cards) - i - 1
+
+    return None
+
+
 def _find_stack_which_can_stack(
     board: Board, card: Card, ignored_stacks: list[int] = []
 ) -> int:
