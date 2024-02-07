@@ -446,6 +446,12 @@ class Board:
     def get_hashed_state(self):
         return hash(self.get_state())
 
+    def get_stack(self, stack_id: int) -> Stack:
+        if stack_id >= 0 and stack_id < len(self.stacks):
+            return self.stacks[stack_id]
+        else:
+            raise ValueError("Invalid stack id")
+
     def _count_breaking_cards(self, condition):
         count = 0
         for stack in self.stacks:
