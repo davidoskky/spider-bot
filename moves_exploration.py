@@ -227,6 +227,85 @@ def find_improved_equivalent_position(board: Board):
     )
 
 
+def find_improved_equivalent_position_manual(board: Board) -> list[Move]:
+    for source_stack_index, source_stack in enumerate(board.stacks):
+        stacked_cards = source_stack.get_stacked()
+
+        # Only consider the first card if it's the only card in the stack
+        if len(source_stack.cards) > 1:
+            stacked_cards = stacked_cards[:1]
+
+        for card_index, card in enumerate(stacked_cards):
+            for target_stack_index, target_stack in enumerate(board.stacks):
+                if target_stack_index == source_stack_index:
+                    continue
+                if target_stack.is_empty():
+                    continue
+
+                target_card_index = find_placement_index_for_card(
+                    card, target_stack, should_sequence=True
+                )
+
+                if target_card_index is None:
+                    continue
+
+                target_card = target_stack.cards[target_card_index]
+                if is_sequence_improved(source_stack, target_stack, card, target_card):
+                    moves = move_cards_removing_interfering(
+                        board, source_stack_index, target_stack_index, card_index
+                    )
+                    if moves:
+                        return moves
+
+    return []
+
+
+def is_sequence_improved(
+    source_stack: Stack, target_stack: Stack, source_card: Card, target_card: Card
+) -> bool:
+    """
+    Determines if moving a card to a target index in a different stack results in a longer sequence by merging
+    accessible sequences from the source and target stacks.
+
+    :param source_stack: The stack from which the card is moved.
+    :param target_stack: The stack to which the card is moved.
+    :param card: The card being moved.
+    :param target_index: The target position in the target stack.
+    :return: True if the sequence is improved, False otherwise.
+    """
+
+    source_sequences = source_stack.get_accessible_sequences()
+    target_sequences = target_stack.get_accessible_sequences()
+
+    # Find the sequence in the source stack that includes the card
+    source_sequence = None
+    for seq in source_sequences:
+        if source_card in seq:
+            source_sequence = seq
+            break
+
+    # If the card is not in any accessible sequence or there's no sequence in the source, no improvement can be made
+    if not source_sequence:
+        return False
+
+    # Find the target sequence in the target stack that would merge with the source sequence
+    target_sequence = []
+    for seq in target_sequences:
+        if target_card in seq:
+            target_sequence = seq
+            break
+
+    if not target_sequence:
+        return False
+
+    source_pos_from_end = len(source_sequence) - source_sequence.index(source_card)
+    target_pos_from_start = target_sequence.index(target_card) + 1
+
+    combined_length = source_pos_from_end + target_pos_from_start
+
+    return combined_length > len(target_sequence)
+
+
 # TODO: This is not correct it should be sequence length can be increased and consider
 # like 9 - 8 - 7 - 6 and 6 - 5 - 4 - 3 - 2 - 1 can still be merged even though 6 cannot sequence 6
 def _identify_plausible_improved_equivalent_positions(board: Board) -> bool:
@@ -715,9 +794,11 @@ def _move_stacked_to_temporary_position(
     """
     stack = board.get_stack(stack_id)
     if card_index >= len(stack.cards):
-        return []  # Return an empty list if the card_index is out of bounds
+        return []
 
     temporary_stack_id = find_stack_to_move_sequence(board, stack.cards[card_index])
+    if temporary_stack_id is None:
+        return []
 
     return move_card_to_top(board, stack_id, temporary_stack_id, card_index)
 
@@ -870,6 +951,10 @@ def move_card_to_top(board: Board, source_id, target_id, card_to_move) -> list[M
 
     # Ensure the card to move is within the stack
     if card_to_move >= len(cloned_board.stacks[source_id].cards):
+        return moves
+    if not board.get_stack(target_id).can_stack(
+        board.get_stack(source_id).cards[card_to_move]
+    ):
         return moves
 
     while True:
@@ -1042,7 +1127,9 @@ def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int:
     return selected_stack_id
 
 
-def find_placement_index_for_card(card: Card, stack: Stack) -> int | None:
+def find_placement_index_for_card(
+    card: Card, stack: Stack, should_sequence=False
+) -> int | None:
     """
     Finds the position within a given stack where a card can be legally placed according to the game's stacking rules.
     It considers only the visible and accessible cards.
@@ -1063,7 +1150,9 @@ def find_placement_index_for_card(card: Card, stack: Stack) -> int | None:
     accessible_cards.reverse()
 
     for i, accessible_card in enumerate(accessible_cards):
-        if accessible_card.can_stack(card):
+        if not should_sequence and accessible_card.can_stack(card):
+            return len(stack.cards) - i - 1
+        elif should_sequence and accessible_card.can_sequence(card):
             return len(stack.cards) - i - 1
 
     return None
