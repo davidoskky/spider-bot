@@ -240,6 +240,8 @@ def find_improved_equivalent_position_manual(board: Board) -> list[Move]:
         )
 
         for card in cards_to_consider:
+            if card.rank == 14:
+                continue
             card_index = (
                 len(source_stack.cards) - 1 - source_stack.cards[::-1].index(card)
             )
