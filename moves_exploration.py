@@ -229,13 +229,21 @@ def find_improved_equivalent_position(board: Board):
 
 def find_improved_equivalent_position_manual(board: Board) -> list[Move]:
     for source_stack_index, source_stack in enumerate(board.stacks):
-        stacked_cards = source_stack.get_stacked()
+        if source_stack.is_empty():
+            continue
 
-        # Only consider the first card if it's the only card in the stack
-        if len(source_stack.cards) > 1:
-            stacked_cards = stacked_cards[:1]
+        # Consider the first card if it's the only card, otherwise consider only the first card in sequence
+        cards_to_consider = (
+            [source_stack.cards[0]]
+            if len(source_stack.cards) == 1
+            else source_stack.get_stacked()[1:]
+        )
 
-        for card_index, card in enumerate(stacked_cards):
+        for card in cards_to_consider:
+            card_index = (
+                len(source_stack.cards) - 1 - source_stack.cards[::-1].index(card)
+            )
+
             for target_stack_index, target_stack in enumerate(board.stacks):
                 if target_stack_index == source_stack_index:
                     continue
@@ -303,7 +311,9 @@ def is_sequence_improved(
 
     combined_length = source_pos_from_end + target_pos_from_start
 
-    return combined_length > len(target_sequence)
+    return combined_length > len(target_sequence) and combined_length > len(
+        source_sequence
+    )
 
 
 # TODO: This is not correct it should be sequence length can be increased and consider
