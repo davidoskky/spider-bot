@@ -434,7 +434,7 @@ def move_cards_removing_interfering(
 
     # Clear any cards covering the target position
     clearance_moves = _move_stacked_to_temporary_position(
-        board, target_stack_id, target_card_id + 1
+        cloned_board, target_stack_id, target_card_id + 1
     )
     logging.debug(f"switch_stacked: clearance_moves = {clearance_moves}")
     cloned_board.execute_moves(clearance_moves)
@@ -807,15 +807,18 @@ def _move_stacked_to_temporary_position(
     - The choice of the temporary stack is determined by an internal strategy that may vary based on the board's
       current state and the specific rules or constraints of the game being played.
     """
-    stack = board.get_stack(stack_id)
+    cloned_board = board.clone()
+    stack = cloned_board.get_stack(stack_id)
     if card_index >= len(stack.cards):
         return []
 
-    temporary_stack_id = find_stack_to_move_sequence(board, stack.cards[card_index])
+    temporary_stack_id = find_stack_to_move_sequence(
+        cloned_board, stack.cards[card_index]
+    )
     if temporary_stack_id is None:
         return []
 
-    return move_card_to_top(board, stack_id, temporary_stack_id, card_index)
+    return move_card_to_top(cloned_board, stack_id, temporary_stack_id, card_index)
 
 
 def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
