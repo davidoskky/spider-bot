@@ -234,9 +234,12 @@ def find_improved_equivalent_position_manual(board: Board) -> list[Move]:
 
         # Consider the first card if it's the only card, otherwise consider only the first card in sequence
         cards_to_consider = (
-            [source_stack.cards[0]]
-            if len(source_stack.cards) == 1
+            source_stack.cards[0:]
+            if source_stack.first_card_of_valid_stacked() == 0
             else source_stack.get_stacked()[1:]
+        )
+        logging.debug(
+            f"find_improved_equivalent_position_manual: cards_to_consider = {cards_to_consider}"
         )
 
         for card in cards_to_consider:
