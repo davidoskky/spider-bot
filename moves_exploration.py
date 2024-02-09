@@ -835,7 +835,6 @@ def _move_stacked_to_temporary_position(
 def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
     moves: list[Move] = []
     cloned_board = board.clone()
-    available_dof = degrees_of_freedom_for_empty_stacks(board.count_empty_stacks())
     initial_empty_stacks = cloned_board.count_empty_stacks()
 
     stack_to_free_id = _select_stack_to_free(cloned_board, ignored_stacks)
@@ -854,7 +853,8 @@ def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
 
     logging.debug(f"free_stack: moves = {moves}")
     if not moves:
-        return []
+        ignored_stacks.append(stack_to_free_id)
+        return free_stack(board, ignored_stacks = ignored_stacks)
 
     cloned_board.execute_moves(moves)
 
