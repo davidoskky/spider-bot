@@ -1,16 +1,13 @@
 import os
 import random
-from moves_exploration import (
-    DEFAULT_WEIGHTS,
-    Move,
-    find_improved_equivalent_position,
-    find_move_increasing_stacked_length,
-    find_moves_freeing_covered_cards,
-    find_progressive_actions,
-    free_stack,
-    is_board_winnable,
-    score_board,
-)
+
+from moves_exploration import (DEFAULT_WEIGHTS, Move,
+                               find_improved_equivalent_position,
+                               find_improved_equivalent_position_manual,
+                               find_move_increasing_stacked_length,
+                               find_moves_freeing_covered_cards,
+                               find_progressive_actions, free_stack,
+                               is_board_winnable, score_board)
 from spiderSolitaire import SpiderSolitaire
 
 
@@ -71,7 +68,7 @@ class SpiderSolitaireBot:
         current_score = score_board(self.game.board, weights)
         cycle = 0
 
-        def try_execute_moves(moves, description=""):
+        def try_execute_moves(moves: list[Move], description=""):
             nonlocal current_score, moves_made
             if moves:
                 if verbose > 0:
@@ -88,7 +85,7 @@ class SpiderSolitaireBot:
             try_execute_moves(free_stack(self.game.board), "Free Stack")
 
             try_execute_moves(
-                find_improved_equivalent_position(self.game.board), "Improved"
+                find_improved_equivalent_position_manual(self.game.board), "Improved"
             )
             try_execute_moves(
                 find_move_increasing_stacked_length(self.game.board), "Stacked"
