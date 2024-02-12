@@ -836,7 +836,7 @@ def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
     initial_empty_stacks = cloned_board.count_empty_stacks()
 
     stack_to_free_id = _select_stack_to_free(cloned_board, ignored_stacks)
-    if stack_to_free_id == -1:
+    if stack_to_free_id is None:
         logging.debug(f"free_stack: No stack can be freed")
         return moves
 
@@ -1126,9 +1126,9 @@ def cards_to_sequences(cards: list[Card]) -> list[list[Card]]:
     return sequences
 
 
-def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int:
+def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int|None:
     highest_rank = -1
-    selected_stack_id = -1
+    selected_stack_id = None
     available_dof = degrees_of_freedom_for_empty_stacks(board.count_empty_stacks())
     for id, stack in enumerate(board.stacks):
         if id in ignored_stacks or stack.is_empty() or not stack.is_stacked_on_table():
