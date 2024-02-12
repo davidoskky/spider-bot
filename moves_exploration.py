@@ -474,7 +474,7 @@ def _check_for_reversible_move(
                     source_seq_index,
                     source_sequences,
                 )
-                top_cards = get_top_cards(board, [source_index, target_index])
+                top_cards = get_top_cards_board(board, [source_index, target_index])
                 logging.debug(
                     f"find_reversible_move: merged_sequence = {repr(merged_sequence)}"
                 )
@@ -508,15 +508,7 @@ def _generate_unique_index_pairs(amount_of_stacks):
                 yield source_index, target_index
 
 
-def get_uninvolved_top_cards(board: Board, source_index: int, target_index: int):
-    return [
-        stack.top_card()
-        for i, stack in enumerate(board.stacks)
-        if i not in [source_index, target_index] and not stack.is_empty()
-    ]
-
-
-def get_top_cards(board: Board, ignored_stacks: list[int]) -> list[Card]:
+def get_top_cards_board(board: Board, ignored_stacks: list[int]) -> list[Card]:
     """
     Retrieves the top card from each stack in the board, excluding specified stacks and empty ones.
 
@@ -527,10 +519,24 @@ def get_top_cards(board: Board, ignored_stacks: list[int]) -> list[Card]:
     Returns:
     - List[Card]: A list of top cards from the stacks not ignored and not empty.
     """
+    filtered_stacks = [stack for i, stack in enumerate(board.stacks) if i not in ignored_stacks]
+
+    return get_top_cards(filtered_stacks)
+
+def get_top_cards(stacks: list[Stack]):
+    """
+    Retrieves the top card from each given stack, excluding empty ones.
+
+    Parameters:
+    - stacks (List[Stack]): A list of stacks to retrieve top cards from.
+
+    Returns:
+    - List[Card]: A list of top cards from non-empty stacks. Excludes None values.
+    """
     return [
         card
-        for i, stack in enumerate(board.stacks)
-        if i not in ignored_stacks and not stack.is_empty() and (card := stack.top_card()) is not None
+        for stack in stacks
+        if not stack.is_empty() and (card := stack.top_card()) is not None
     ]
 
 
@@ -621,7 +627,7 @@ def can_move_stacked_reversibly(
     :param empty_stacks: Number of empty stacks available on the board.
     :return: True if the sequences can be moved reversibly, False otherwise.
     """
-    top_cards = [stack.top_card() for stack in stacks if not stack.is_empty()]
+    top_cards = get_top_cards(stacks)
     degrees_of_freedom = degrees_of_freedom_for_empty_stacks(empty_stacks)
     max_dof_required, used_stacks = dof_to_move_stacked_reversibly(
         stacked_cards, top_cards
@@ -1163,7 +1169,7 @@ def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int|None:
 
             dof_needed, _ = dof_to_move_stacked_reversibly(
                 cards_to_sequences(cards_to_move),
-                get_top_cards(board, [id]),
+                get_top_cards_board(board, [id]),
             )
 
             if dof_needed <= available_dof:
