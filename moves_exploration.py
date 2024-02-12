@@ -516,11 +516,21 @@ def get_uninvolved_top_cards(board: Board, source_index: int, target_index: int)
     ]
 
 
-def get_top_cards(board: Board, ignored_stacks: list[int]):
+def get_top_cards(board: Board, ignored_stacks: list[int]) -> list[Card]:
+    """
+    Retrieves the top card from each stack in the board, excluding specified stacks and empty ones.
+
+    Parameters:
+    - board (Board): The current state of the board.
+    - ignored_stacks (List[int]): Indices of stacks to be ignored.
+
+    Returns:
+    - List[Card]: A list of top cards from the stacks not ignored and not empty.
+    """
     return [
-        stack.top_card()
+        card
         for i, stack in enumerate(board.stacks)
-        if i not in ignored_stacks and not stack.is_empty()
+        if i not in ignored_stacks and not stack.is_empty() and (card := stack.top_card()) is not None
     ]
 
 
