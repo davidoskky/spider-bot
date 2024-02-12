@@ -822,8 +822,6 @@ def _move_stacked_to_temporary_position(
     temporary_stack_id = find_stack_to_move_sequence(
         cloned_board, stack.cards[card_index]
     )
-    if temporary_stack_id is None:
-        return []
 
     logging.debug(f"_move_stacked_to_temporary_position: stack = {stack_id}, card = {card_index}, temporary = {temporary_stack_id}")
     moves = move_card_to_top(cloned_board, stack_id, temporary_stack_id, card_index)
