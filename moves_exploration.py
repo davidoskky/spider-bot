@@ -785,19 +785,26 @@ def dof_to_move_stacked_reversibly(
 def find_partially_stackable(
     board: Board, sequence: list[Card], ignored_stacks: list[int]
 ) -> tuple[int, int]:
-    for stack_index, stack in enumerate(board.stacks):
-        if stack_index in ignored_stacks or stack.is_empty():
-            continue
+    """
+    Finds a stack where a part of the given sequence can be stacked, starting from the second card in the sequence.
 
-        top_card = stack.top_card()
-        for sequence_index, element in enumerate(
-            sequence[1:], start=1
-        ):  # start=1 to skip the top card
+    Parameters:
+    - board (Board): The current state of the board.
+    - sequence (list[Card]): The sequence of cards to check for partial stackability.
+    - ignored_stacks (list[int]): Indices of stacks to be ignored during the search.
+
+    Returns:
+    - tuple[int, int]: A tuple containing the index of the stack where the sequence can be partially stacked and the index within the sequence where stacking can start. Returns (-1, -1) if no such stack is found.
+    """
+    top_cards = get_top_cards_board(board, ignored_stacks)
+
+    for top_card in top_cards:
+        for sequence_index, element in enumerate(sequence[1:], start=1): # start=1 to skip the top card
             if top_card.can_stack(element):
-                return (
-                    stack_index,
-                    sequence_index,
-                )
+                original_stack_index = [
+                    i for i, stack in enumerate(board.stacks) if stack.top_card() == top_card
+                ][0]
+                return original_stack_index, sequence_index
 
     return (-1, -1)
 
