@@ -890,9 +890,17 @@ def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
 
 
 def stacks_which_can_be_freed(board: Board) -> int:
-    """Tells how many stacks can be freed through reversible moves"""
-    initial_free_stacks = board.count_empty_stacks()
+    """
+    Determines how many stacks can be freed on the board through reversible moves.
+
+    Parameters:
+    - board (Board): The current state of the board.
+
+    Returns:
+    - int: The number of additional stacks that can be freed through reversible moves.
+    """
     cloned_board = board.clone()
+    initial_free_stacks = cloned_board.count_empty_stacks()
 
     moves = free_stack(board)
     while moves:
@@ -909,32 +917,33 @@ def _reversible_move_away_from_stack(
     sequences: list[list[Card]],
     stack_to_free_id: int,
     ignored_stacks: list[int],
-    available_dof: int,
     consider_split: bool = False,
 ) -> list[Move]:
     """
-    In one single reversible set of moves takes away some of the sequences given as input from the input stack
+    Attempts to reversibly move sequences from a specified stack to another stack, considering the available degrees
+    of freedom (DoF) and optionally allowing sequences to be split.
     """
     moves: list[Move] = []
     length_considered_sequence = 0
     stack_to_free = board.stacks[stack_to_free_id]
+    available_dof = dof_board(board)
 
     for sequence in reversed(sequences):
         length_considered_sequence += 1
         if consider_split:
-            temporary_stack_id, card_sequence_id = find_partially_stackable(
+            target_stack_id, card_sequence_id = find_partially_stackable(
                 board, sequence, ignored_stacks
             )
         else:
-            temporary_stack_id = _find_stack_which_can_stack(
+            target_stack_id = _find_stack_which_can_stack(
                 board, sequence[0], ignored_stacks
             )
             card_sequence_id = 0
 
-        if temporary_stack_id >= 0:
+        if target_stack_id >= 0:
             card_id = stack_to_free.cards.index(sequence[card_sequence_id])
             moves = _move_card_to_no_intermediates(
-                board, stack_to_free_id, temporary_stack_id, card_id
+                board, stack_to_free_id, target_stack_id, card_id
             )
             if moves:
                 break
@@ -1045,7 +1054,6 @@ def move_card_to_top(board: Board, source_id, target_id, card_id) -> list[Move]:
                 sequences,
                 source_id,
                 [source_id],
-                degrees_of_freedom,
                 consider_split=consider_split,
             )
 
