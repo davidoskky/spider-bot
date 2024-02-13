@@ -465,7 +465,7 @@ def move_cards_removing_interfering(
     else:
         cloned_board = board.clone()
         clearance_moves = _move_stacked_to_temporary_position(
-            cloned_board, source_stack_id, source_card_id + 1
+            cloned_board, source_stack_id, source_card_id + 1,ignored_stacks=[target_stack_id]
         )
         cloned_board.execute_moves(clearance_moves)
         second_clearance_moves = _move_stacked_to_temporary_position(
@@ -812,7 +812,7 @@ def dof_to_move_stacked_reversibly(
 
 
 def _move_stacked_to_temporary_position(
-    board: Board, stack_id: int, card_index: int
+        board: Board, stack_id: int, card_index: int, ignored_stacks: list[int] = []
 ) -> list[Move]:
     """
     Moves a card, along with any cards stacked on top of it, from the specified stack to a temporary stack.
@@ -841,6 +841,7 @@ def _move_stacked_to_temporary_position(
     """
     logging.debug(f"_move_stacked_to_temporary_position: attempting to move card {card_index} from stack {stack_id}")
     moves = []
+    clearing_moves = []
     cloned_board = board.clone()
     stack = cloned_board.get_stack(stack_id)
     if card_index >= len(stack.cards):
@@ -848,20 +849,32 @@ def _move_stacked_to_temporary_position(
         return []
 
     temporary_stack_ids = find_stacks_to_move_card(
-        cloned_board, stack.cards[card_index], ignore_empty=True
+        cloned_board, stack.cards[card_index], ignored_stacks=[], ignore_empty=True
     )
     if not temporary_stack_ids:
+        if cloned_board.count_empty_stacks() == 0:
+            clearing_moves = free_stack(cloned_board)
+            if clearing_moves:
+                cloned_board.execute_moves(clearing_moves)
+            else:
+                return []
         temporary_stack_ids = find_stacks_to_move_card(
-            cloned_board, stack.cards[card_index], ignore_empty=False
+            cloned_board, stack.cards[card_index], ignored_stacks=[], ignore_empty=False
         )
 
     logging.debug(f"_move_stacked_to_temporary_position: plausible stacks = {temporary_stack_ids}")
 
     for temporary_stack_id in temporary_stack_ids:
+        if temporary_stack_id in ignored_stacks:
+            continue
         logging.debug(f"_move_stacked_to_temporary_position: stack = {stack_id}, card = {card_index}, temporary = {temporary_stack_id}")
         moves = move_card_to_top(cloned_board, stack_id, temporary_stack_id, card_index)
         if moves:
             break
+
+    if clearing_moves:
+        clearing_moves.extend(moves)
+        moves = clearing_moves
      
     logging.debug(f"_move_stacked_to_temporary_position: moves = {moves}")
 
