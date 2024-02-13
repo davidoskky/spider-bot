@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from deck import Card, Deck
-from moves_exploration import find_improved_equivalent_position_manual
+from moves_exploration import find_improved_equivalent_position
 from spiderSolitaire import Board, Stack
 
 
@@ -17,7 +17,7 @@ def test_simple_move_one_card():
     stacks = tuple(stacks)
     board = Board(stacks=stacks, deck=Deck(), completed_stacks=0)
 
-    result = find_improved_equivalent_position_manual(board)
+    result = find_improved_equivalent_position(board)
     assert result != [], "Should not return an empty list"
     assert len(result) == 1, "Should take three moves"
 
@@ -32,7 +32,7 @@ def test_should_not_move():
     stacks = tuple(stacks)
     board = Board(stacks=stacks, deck=Deck(), completed_stacks=0)
 
-    result = find_improved_equivalent_position_manual(board)
+    result = find_improved_equivalent_position(board)
     assert result == [], "Should return an empty list"
 
 
@@ -48,7 +48,7 @@ def test_several_switches():
     stacks = tuple(stacks)
     board = Board(stacks=stacks, deck=Deck(), completed_stacks=0)
 
-    result = find_improved_equivalent_position_manual(board)
+    result = find_improved_equivalent_position(board)
     assert result != [], "Should not return an empty list"
 
 
@@ -69,7 +69,7 @@ def test_error_09_02():
 
     board = Board(stacks=tuple(stacks), deck=Deck(), completed_stacks=0)
 
-    result = find_improved_equivalent_position_manual(board)
+    result = find_improved_equivalent_position(board)
 
     assert result == []
 
@@ -88,7 +88,7 @@ def test_switch2():
 
     board = Board(stacks=tuple(stacks), deck=Deck(), completed_stacks=0)
 
-    result = find_improved_equivalent_position_manual(board)
+    result = find_improved_equivalent_position(board)
     logging.debug(f"{board.display_game_state()}")
 
     assert result != []
@@ -159,7 +159,7 @@ def test_valid_move_11_02():
 
     board = Board(stacks=tuple(stacks), deck=Deck(), completed_stacks=0)
 
-    result = find_improved_equivalent_position_manual(board)
+    result = find_improved_equivalent_position(board)
 
     assert result != [], "Should not produce an invalid move"
 
@@ -219,7 +219,111 @@ def test_error_13_02():
 
     board = Board(stacks=tuple(stacks), deck=Deck(), completed_stacks=0)
 
-    result = find_improved_equivalent_position_manual(board)
+    result = find_improved_equivalent_position(board)
 
     assert result != [], "A solution is available"
     # assert len(result) == 6, "The shortest solution requires 6 moves"
+
+
+def test_should_move_start_of_stacked():
+    """
+    Stack 0: XX 10♥ 9♥ 8♥ 7♠
+    Stack 1:
+    Stack 2: XX 11♥ 10♥
+    """
+    stacks = [Stack([Card(1, 1)]) for _ in range(10)]
+
+    # Define cards for Stack 0
+    stacks[0] = Stack([Card(1, 0), Card(10, 1), Card(9, 1), Card(8, 1), Card(7, 3)])
+    stacks[1] = Stack([])
+    stacks[2] = Stack([Card(1, 0), Card(11, 1), Card(10, 1)])
+
+    # Set the first visible card for stacks with hidden cards
+    for stack in [stacks[0], stacks[2]]:
+        stack.first_visible_card = 1  # Assuming the first card is hidden
+
+    # Initialize the board with the defined stacks
+    board = Board(stacks=tuple(stacks), deck=Deck(), completed_stacks=0)
+
+    result = find_improved_equivalent_position(board)
+
+    assert (
+        result != []
+    ), "Expected to find at least one improved equivalent position but got an empty list"
+    assert len(result) == 2
+
+def test_should_move_start_of_stack():
+    """
+    Stack 0: 10♥ 9♥ 8♥ 7♠
+    Stack 1:
+    Stack 2: XX 11♥ 10♥
+    """
+    stacks = [Stack([Card(1, 1)]) for _ in range(10)]
+
+    # Define cards for Stack 0
+    stacks[0] = Stack([Card(10, 1), Card(9, 1), Card(8, 1), Card(7, 3)])
+    stacks[1] = Stack([])
+    stacks[2] = Stack([Card(1, 0), Card(11, 1), Card(10, 1)])
+
+    stacks[0].first_visible_card = 0
+    stacks[2].first_visible_card = 1
+
+    # Initialize the board with the defined stacks
+    board = Board(stacks=tuple(stacks), deck=Deck(), completed_stacks=0)
+
+    result = find_improved_equivalent_position(board)
+
+    assert (
+        result != []
+    ), "Expected to find at least one improved equivalent position but got an empty list"
+    assert len(result) == 2
+
+
+def test_should_not_move_equivalent_start_of_stacked():
+    """
+    Stack 0: XX 10♥ 9♥ 8♥ 7♠
+    Stack 1:
+    Stack 2: XX 11♥ 10♥
+    """
+    stacks = [Stack([Card(1, 1)]) for _ in range(10)]
+
+    # Define cards for Stack 0
+    stacks[0] = Stack([Card(1, 0), Card(10, 1), Card(9, 1), Card(8, 1), Card(7, 3)])
+    stacks[1] = Stack([])
+    stacks[2] = Stack([Card(1, 0), Card(10, 1)])
+
+    # Set the first visible card for stacks with hidden cards
+    for stack in [stacks[0], stacks[2]]:
+        stack.first_visible_card = 1  # Assuming the first card is hidden
+
+    # Initialize the board with the defined stacks
+    board = Board(stacks=tuple(stacks), deck=Deck(), completed_stacks=0)
+
+    result = find_improved_equivalent_position(board)
+
+    assert result == [], "Should not move"
+
+
+def test_should_not_move_equivalent_start_of_stack():
+    """
+    Stack 0: 10♥ 9♥ 8♥ 7♠
+    Stack 1:
+    Stack 2: XX 11♥ 10♥
+    """
+    stacks = [Stack([Card(1, 1)]) for _ in range(10)]
+
+    # Define cards for Stack 0
+    stacks[0] = Stack([Card(10, 1), Card(9, 1), Card(8, 1), Card(7, 3)])
+    stacks[1] = Stack([])
+    stacks[2] = Stack([Card(1, 0), Card(10, 1)])
+
+
+    stacks[0].first_visible_card = 0
+    stacks[2].first_visible_card = 1
+
+    # Initialize the board with the defined stacks
+    board = Board(stacks=tuple(stacks), deck=Deck(), completed_stacks=0)
+
+    result = find_improved_equivalent_position(board)
+
+    assert result == [], "Should not move"

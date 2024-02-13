@@ -209,25 +209,7 @@ def find_progressive_actions(board: Board):
         max_depth=6,
     )
 
-
-def find_improved_equivalent_position(board: Board):
-    if not search_for_beneficial_reversible_move(board):
-        return []
-
-    initial_sequence_length = board.sequence_length_indicator()
-    initial_completed_stacks = board.count_completed_stacks()
-
-    return bfs_first_path(
-        board,
-        win_condition=lambda board: is_more_sequence_length_indicator(
-            board, initial_sequence_length
-        )
-        or is_more_completed_stacks(board, initial_completed_stacks),
-        max_depth=6,
-    )
-
-
-def find_improved_equivalent_position_manual(board: Board) -> list[Move]:
+def find_improved_equivalent_position(board: Board) -> list[Move]:
     """
     Finds a set of reversible moves leading to an improved equivalent position for a card within the board by moving it to a different stack
     where it extends a sequence, enhancing the board's overall state.
