@@ -271,6 +271,87 @@ def find_improved_equivalent_position(board: Board) -> list[Move]:
     return []
 
 
+def find_move_increasing_stacked_length_manual(board: Board) -> list[Move]:
+    """
+    Finds a set of reversible moves leading to a board position with an increased stacked length,
+    without reducing the sequence length or the number of empty stacks.
+
+    Parameters:
+    - board (Board): The current state of the board.
+
+    Returns:
+    - List[Move]: A list of moves that result in an improved board position, or an empty list if no such move exists.
+    """
+    for source_stack_index, source_stack in enumerate(board.stacks):
+        if source_stack.is_empty():
+            continue
+
+        first_card_to_consider = source_stack.first_card_of_valid_stacked()
+        if first_card_to_consider > 0:
+            # Don't consider the card if it is stacked over a covered one
+            first_card_to_consider += 1
+
+        logging.debug(f"find_move_increasing_stacked_length_manual: considering cards = {source_stack.cards[first_card_to_consider:]}")
+
+        for card_index in range(first_card_to_consider, len(source_stack.cards)):
+            card = source_stack.cards[card_index]
+            if card.rank == 14: # The king cannot be moved reversibly
+                continue
+            # Do not try moving cards which are in a sequence
+            if source_stack.is_in_sequence(card_index):
+                continue
+
+            logging.debug(f"find_move_increasing_stacked_length_manual: considering card {card}")
+
+            for target_stack_index, target_stack in enumerate(board.stacks):
+                # Don't consider moving to empty stack, this check should not be necessary, but just in case
+                if target_stack_index == source_stack_index or target_stack.is_empty():
+                    continue
+
+                target_card_index = find_placement_index_for_card(
+                    card, target_stack, should_sequence=False
+                )
+                if target_card_index is None:
+                    continue
+
+                logging.debug(
+                    f"find_move_increasing_stacked_length: target_card_ind = {target_card_index}"
+                )
+
+                if is_stacked_improved(source_stack, target_stack, card_index, target_card_index):
+                    logging.debug(
+                        f"find_move_increasing_stacked_length: source = {source_stack_index}, target = {target_stack_index}, card = {card_index}"
+                    )
+                    moves = move_cards_removing_interfering(
+                        board, source_stack_index, target_stack_index, card_index
+                    )
+                    if moves:
+                        return moves
+
+    return []
+
+
+def find_move_increasing_stacked_length(board: Board):
+    initial_sequence_length = board.sequence_length_indicator()
+    initial_stacked_length = board.stacked_length_indicator()
+    initial_empty_stacks = board.count_empty_stacks()
+
+    def win_condition_with_logging(board):
+        more_stacked = is_more_stacked_length(board, initial_stacked_length)
+        less_sequence = is_less_sequence_length_indicator(
+            board, initial_sequence_length
+        )
+        more_empty = is_more_empty_stacks(board, initial_empty_stacks)
+        win_condition = (more_stacked or more_empty) and not less_sequence
+        return win_condition
+
+    return bfs_first_path(
+        board,
+        win_condition=win_condition_with_logging,
+        max_depth=5,
+    )
+
+
 def is_sequence_improved(
     source_stack: Stack, target_stack: Stack, source_card: Card, target_card: Card
 ) -> bool:
@@ -314,9 +395,44 @@ def is_sequence_improved(
 
     combined_length = source_pos_from_end + target_pos_from_start
 
-    return combined_length > len(target_sequence) and combined_length > len(
-        source_sequence
-    )
+    return combined_length > max(len(target_sequence), len(source_sequence))
+
+def is_stacked_improved(
+    source_stack: Stack, target_stack: Stack, source_card_id: int, target_card_id: int
+) -> bool:
+    """
+    Determines if moving a card to a target index in a different stack results in a longer stacked by merging
+    accessible sequences from the source and target stacks.
+
+    :param source_stack: The stack from which the card is moved.
+    :param target_stack: The stack to which the card is moved.
+    :param card: The card being moved.
+    :param target_index: The target position in the target stack.
+    :return: True if the sequence is improved, False otherwise.
+    """
+
+    if source_card_id < source_stack.first_card_of_valid_stacked() or target_card_id < target_stack.first_card_of_valid_stacked():
+        raise ValueError("Invalid card accessed")
+    source_sequence = source_stack.cards[source_card_id:]
+    target_sequence = target_stack.cards[target_stack.first_card_of_valid_stacked() : target_card_id]
+    remaining_source = source_stack.cards[source_stack.first_card_of_valid_stacked() : source_card_id]
+
+    logging.debug(f"is_stacked_improved: source_seq = {source_sequence}, target_sequence = {target_sequence}")
+
+    if not source_sequence:
+        logging.debug(f"is_stacked_improved: No source sequence")
+        return False
+    if not target_sequence:
+        logging.debug(f"is_stacked_improved: No target sequence")
+        return False
+
+    if not target_sequence[-1].can_stack(source_sequence[0]):
+        logging.debug(f"is_stacked_improved: Cannot stack")
+        return False
+
+    logging.debug(f"is_stacked_improved: len target_seq = {len(target_sequence)}, len remaining_source = {len(remaining_source)}")
+
+    return len(target_sequence) > len(remaining_source)
 
 
 # TODO: This is not correct it should be sequence length can be increased and consider
@@ -433,7 +549,7 @@ def move_cards_removing_interfering(
     # Clear any cards covering the target position
     # Maybe this should be done by sequence as well
     clearance_moves = _move_stacked_to_temporary_position(
-        cloned_board, target_stack_id, target_card_id + 1
+        cloned_board, target_stack_id, target_card_id
     )
     logging.debug(f"move_cards_removing_interfering: clearance_moves = {clearance_moves}")
     cloned_board.execute_moves(clearance_moves)
@@ -451,7 +567,7 @@ def move_cards_removing_interfering(
         )
         cloned_board.execute_moves(clearance_moves)
         second_clearance_moves = _move_stacked_to_temporary_position(
-            cloned_board, target_stack_id, target_card_id + 1, ignored_stacks=[source_stack_id]
+            cloned_board, target_stack_id, target_card_id, ignored_stacks=[source_stack_id]
         )
         cloned_board.execute_moves(second_clearance_moves)
         moves_to_complete_switch = move_card_to_top(
@@ -567,28 +683,6 @@ def is_beneficial_merge(
     return False, 0
 
 
-def find_move_increasing_stacked_length(board: Board):
-    # if not _identify_plausible_increasing_stacked(board):
-    #    return []
-
-    initial_sequence_length = board.sequence_length_indicator()
-    initial_stacked_length = board.stacked_length_indicator()
-    initial_empty_stacks = board.count_empty_stacks()
-
-    def win_condition_with_logging(board):
-        more_stacked = is_more_stacked_length(board, initial_stacked_length)
-        less_sequence = is_less_sequence_length_indicator(
-            board, initial_sequence_length
-        )
-        more_empty = is_more_empty_stacks(board, initial_empty_stacks)
-        win_condition = (more_stacked or more_empty) and not less_sequence
-        return win_condition
-
-    return bfs_first_path(
-        board,
-        win_condition=win_condition_with_logging,
-        max_depth=5,
-    )
 
 
 # TODO: Improve this as well
@@ -1308,7 +1402,7 @@ def find_placement_index_for_card(
 
     for i, accessible_card in enumerate(accessible_cards):
         if not should_sequence and accessible_card.can_stack(card):
-            return len(stack.cards) - i - 1
+            return len(stack.cards) - i
         elif should_sequence and accessible_card.can_sequence(card):
             return len(stack.cards) - i - 1
 
