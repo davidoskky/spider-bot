@@ -148,6 +148,12 @@ class Stack:
         """Returns if the given card index is in an accessible stacked sequence"""
         return card_index >= self.first_card_of_valid_stacked()
 
+    def is_in_sequence(self, card_index: int) -> bool:
+        """Returns if the given card is resting on another one which forms a sequence"""
+        if card_index > 1 and card_index > self.first_visible_card:
+            return self.cards[card_index-1].can_stack(self.cards[card_index])
+        return False
+
     def is_stacked_on_table(self):
         """Returns if the first card of stacked sequence is on top of empty board"""
         return self.first_card_of_valid_stacked() == 0
