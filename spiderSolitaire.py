@@ -151,7 +151,7 @@ class Stack:
     def is_in_sequence(self, card_index: int) -> bool:
         """Returns if the given card is resting on another one which forms a sequence"""
         if card_index > 1 and card_index > self.first_visible_card:
-            return self.cards[card_index-1].can_stack(self.cards[card_index])
+            return self.cards[card_index-1].can_sequence(self.cards[card_index])
         return False
 
     def is_stacked_on_table(self):
