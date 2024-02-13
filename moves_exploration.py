@@ -465,11 +465,11 @@ def move_cards_removing_interfering(
     else:
         cloned_board = board.clone()
         clearance_moves = _move_stacked_to_temporary_position(
-            cloned_board, source_stack_id, source_card_id + 1,ignored_stacks=[target_stack_id]
+            cloned_board, source_stack_id, source_card_id + 1, ignored_stacks=[target_stack_id]
         )
         cloned_board.execute_moves(clearance_moves)
         second_clearance_moves = _move_stacked_to_temporary_position(
-            cloned_board, target_stack_id, target_card_id + 1
+            cloned_board, target_stack_id, target_card_id + 1, ignored_stacks=[source_stack_id]
         )
         cloned_board.execute_moves(second_clearance_moves)
         moves_to_complete_switch = move_card_to_top(
@@ -849,17 +849,17 @@ def _move_stacked_to_temporary_position(
         return []
 
     temporary_stack_ids = find_stacks_to_move_card(
-        cloned_board, stack.cards[card_index], ignored_stacks=[], ignore_empty=True
+        cloned_board, stack.cards[card_index], ignored_stacks=ignored_stacks, ignore_empty=True
     )
     if not temporary_stack_ids:
         if cloned_board.count_empty_stacks() == 0:
-            clearing_moves = free_stack(cloned_board)
+            clearing_moves = free_stack(cloned_board, ignored_stacks=ignored_stacks)
             if clearing_moves:
                 cloned_board.execute_moves(clearing_moves)
             else:
                 return []
         temporary_stack_ids = find_stacks_to_move_card(
-            cloned_board, stack.cards[card_index], ignored_stacks=[], ignore_empty=False
+            cloned_board, stack.cards[card_index], ignored_stacks=ignored_stacks, ignore_empty=False
         )
 
     logging.debug(f"_move_stacked_to_temporary_position: plausible stacks = {temporary_stack_ids}")
