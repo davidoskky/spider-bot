@@ -228,13 +228,24 @@ def find_improved_equivalent_position(board: Board):
 
 
 def find_improved_equivalent_position_manual(board: Board) -> list[Move]:
+    """
+    Finds a set of reversible moves leading to an improved equivalent position for a card within the board by moving it to a different stack
+    where it extends a sequence, enhancing the board's overall state.
+
+    Parameters:
+    - board (Board): The current state of the board.
+
+    Returns:
+    - List[Move]: A list of moves that result in an improved board position, or an empty list if no such move exists.
+    """
     for source_stack_index, source_stack in enumerate(board.stacks):
         if source_stack.is_empty():
             continue
 
         # Consider the first card if it's the only card, otherwise consider only the first card in sequence
+        # TODO: What if the first stacked card is in sequence with the rest? This doesn't work
         cards_to_consider = (
-            source_stack.cards[0:]
+            source_stack.cards
             if source_stack.first_card_of_valid_stacked() == 0
             else source_stack.get_stacked()[1:]
         )
@@ -243,28 +254,26 @@ def find_improved_equivalent_position_manual(board: Board) -> list[Move]:
         )
 
         for card in cards_to_consider:
-            if card.rank == 14:
+            if card.rank == 14: # The king cannot be moved reversibly
                 continue
             card_index = (
                 len(source_stack.cards) - 1 - source_stack.cards[::-1].index(card)
             )
 
             for target_stack_index, target_stack in enumerate(board.stacks):
-                if target_stack_index == source_stack_index:
-                    continue
-                if target_stack.is_empty():
+                # Don't consider moving to empty stack, this check should not be necessary, but just in case
+                if target_stack_index == source_stack_index or target_stack.is_empty():
                     continue
 
                 target_card_index = find_placement_index_for_card(
                     card, target_stack, should_sequence=True
                 )
+                if target_card_index is None:
+                    continue
 
                 logging.debug(
                     f"find_improved_equivalent_position_manual: target_card_ind = {target_card_index}"
                 )
-                # Don't consider moving to empty stack, this check should not be necessary, but just in case
-                if target_card_index is None or target_card_index == -1:
-                    continue
 
                 target_card = target_stack.cards[target_card_index]
                 if is_sequence_improved(source_stack, target_stack, card, target_card):
@@ -443,7 +452,7 @@ def move_cards_removing_interfering(
     clearance_moves = _move_stacked_to_temporary_position(
         cloned_board, target_stack_id, target_card_id + 1
     )
-    logging.debug(f"switch_stacked: clearance_moves = {clearance_moves}")
+    logging.debug(f"move_cards_removing_interfering: clearance_moves = {clearance_moves}")
     cloned_board.execute_moves(clearance_moves)
 
     moves_to_complete_switch = move_card_to_top(
@@ -452,6 +461,24 @@ def move_cards_removing_interfering(
     if moves_to_complete_switch:
         moves.extend(clearance_moves)
         moves.extend(moves_to_complete_switch)
+    else:
+        cloned_board = board.clone()
+        clearance_moves = _move_stacked_to_temporary_position(
+            cloned_board, source_stack_id, source_card_id + 1
+        )
+        cloned_board.execute_moves(clearance_moves)
+        second_clearance_moves = _move_stacked_to_temporary_position(
+            cloned_board, target_stack_id, target_card_id + 1
+        )
+        cloned_board.execute_moves(second_clearance_moves)
+        moves_to_complete_switch = move_card_to_top(
+            cloned_board, source_stack_id, target_stack_id, source_card_id
+        )
+        if moves_to_complete_switch:
+            moves.extend(clearance_moves)
+            moves.extend(second_clearance_moves)
+            moves.extend(moves_to_complete_switch)
+
     return moves
 
 
@@ -782,32 +809,6 @@ def dof_to_move_stacked_reversibly(
     return max_dof_used, min(1, current_dof_used)
 
 
-def find_partially_stackable(
-    board: Board, sequence: list[Card], ignored_stacks: list[int]
-) -> tuple[int, int]:
-    """
-    Finds a stack where a part of the given sequence can be stacked, starting from the second card in the sequence.
-
-    Parameters:
-    - board (Board): The current state of the board.
-    - sequence (list[Card]): The sequence of cards to check for partial stackability.
-    - ignored_stacks (list[int]): Indices of stacks to be ignored during the search.
-
-    Returns:
-    - tuple[int, int]: A tuple containing the index of the stack where the sequence can be partially stacked and the index within the sequence where stacking can start. Returns (-1, -1) if no such stack is found.
-    """
-    top_cards = get_top_cards_board(board, ignored_stacks)
-
-    for top_card in top_cards:
-        for sequence_index, element in enumerate(sequence[1:], start=1): # start=1 to skip the top card
-            if top_card.can_stack(element):
-                original_stack_index = [
-                    i for i, stack in enumerate(board.stacks) if stack.top_card() == top_card
-                ][0]
-                return original_stack_index, sequence_index
-
-    return (-1, -1)
-
 
 def _move_stacked_to_temporary_position(
     board: Board, stack_id: int, card_index: int
@@ -845,6 +846,8 @@ def _move_stacked_to_temporary_position(
     temporary_stack_id = find_stack_to_move_sequence(
         cloned_board, stack.cards[card_index]
     )
+    if temporary_stack_id is None:
+        return []
 
     logging.debug(f"_move_stacked_to_temporary_position: stack = {stack_id}, card = {card_index}, temporary = {temporary_stack_id}")
     moves = move_card_to_top(cloned_board, stack_id, temporary_stack_id, card_index)
@@ -866,9 +869,13 @@ def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
     logging.debug(f"Stack to free = {stack_to_free_id}")
 
     stack_to_free = cloned_board.stacks[stack_to_free_id]
-    target_stack_id = _find_stack_which_can_stack(
-        cloned_board, stack_to_free.cards[0], ignored_stacks
+    target_stack_id = find_stack_to_move_sequence(
+        cloned_board, stack_to_free.cards[0], ignored_stacks, ignore_empty=True
     )
+
+    if target_stack_id is None:
+        logging.debug("free_stack: No target stack found, cannot move the sequence")
+        return moves
 
     moves = move_card_to_top(board, stack_to_free_id, target_stack_id, 0)
 
@@ -914,48 +921,41 @@ def stacks_which_can_be_freed(board: Board) -> int:
 
 def _reversible_move_away_from_stack(
     board: Board,
-    sequences: list[list[Card]],
     stack_to_free_id: int,
+    card_id,
     ignored_stacks: list[int],
-    consider_split: bool = False,
 ) -> list[Move]:
     """
-    Attempts to reversibly move sequences from a specified stack to another stack, considering the available degrees
-    of freedom (DoF) and optionally allowing sequences to be split.
+    Attempts to find and execute a reversible move to transfer a sequence of cards from a specific stack to another,
+    aiming to free up the stack while considering the current degrees of freedom (DoF) on the board. The function
+    can optionally split the sequence if it leads to a reversible move and respects the game's constraints.
     """
-    moves: list[Move] = []
-    length_considered_sequence = 0
-    stack_to_free = board.stacks[stack_to_free_id]
-    available_dof = dof_board(board)
+    logging.debug(f"_reversible_move_away_from_stack: Attempting reversible move from stack {stack_to_free_id} starting from card {card_id}")
+    direct_moves = _move_away_direct(board, stack_to_free_id, card_id, ignored_stacks)
+    if direct_moves:
+        return direct_moves
+    return _move_away_splitting(board, stack_to_free_id, card_id, ignored_stacks)
 
-    for sequence in reversed(sequences):
-        length_considered_sequence += 1
-        if consider_split:
-            target_stack_id, card_sequence_id = find_partially_stackable(
-                board, sequence, ignored_stacks
-            )
-        else:
-            target_stack_id = _find_stack_which_can_stack(
-                board, sequence[0], ignored_stacks
-            )
-            card_sequence_id = 0
+def _move_away_splitting(board: Board, stack_id: int, card_id: int, ignored_stacks: list[int] = []) ->list[Move]:
+    logging.debug(f"_move_away_splitting: Attempting to split and move away cards from stack {stack_id} starting from card {card_id}")
+    ignored_stacks.append(stack_id)
 
-        if target_stack_id >= 0:
-            card_id = stack_to_free.cards.index(sequence[card_sequence_id])
-            moves = _move_card_to_no_intermediates(
-                board, stack_to_free_id, target_stack_id, card_id
-            )
-            if moves:
-                break
+    for considered_card_id in range(card_id, len(board.get_stack(stack_id).cards)):
+        can_move = _move_away_direct(board, stack_id, considered_card_id, ignored_stacks)
+        if can_move:
+            return can_move
+    return []
 
-        if length_considered_sequence > available_dof:
-            logging.debug(
-                f"_reversible_move_away_from_stack: considered sequence too long"
-            )
-            break
 
-    logging.debug(f"_reversible_move_away_from_stack: Returning = {moves}")
-    return moves
+def _move_away_direct(board: Board, stack_id: int, card_id: int, ignored_stacks: list[int] = []) -> list[Move]:
+    logging.debug(f"_move_away_direct: Attempting direct move for card {card_id} in stack {stack_id}")
+    target_stack_id = find_stack_to_move_sequence(
+                board, board.get_card(stack_id, card_id), ignored_stacks, ignore_empty=False
+            )
+    if target_stack_id is not None:
+        return _move_card_to_no_splits(board, stack_id, target_stack_id, card_id)
+    logging.debug("No direct move found")
+    return []
 
 
 def _can_be_moved_directly(board: Board, source_id, target_id, card_to_move):
@@ -964,7 +964,10 @@ def _can_be_moved_directly(board: Board, source_id, target_id, card_to_move):
     source_stack = cloned_board.get_stack(source_id)
     target_stack = cloned_board.get_stack(target_id)
 
-    # If the target stack is empty we should account for it 
+    if card_to_move < 0 or card_to_move >= len(source_stack.cards):
+        logging.debug(f"_can_be_moved_directly: Invalid card index provided.")
+        return False
+
     # TODO: I'm unsure this will fix all problems, probably it should be handled better
     if target_stack.is_empty() and available_dof > 0:
         available_dof -=1
@@ -972,7 +975,7 @@ def _can_be_moved_directly(board: Board, source_id, target_id, card_to_move):
 
     if not source_stack.is_stacked(card_to_move) or len(sequences) - 1 > available_dof:
         logging.debug(
-            f"_move_card_to_no_intermediates: Returning early as the input is invalid"
+            f"_can_be_moved_directly: Returning early as the input is invalid"
         )
         return False
     if not target_stack.can_stack(source_stack.cards[card_to_move]):
@@ -981,7 +984,7 @@ def _can_be_moved_directly(board: Board, source_id, target_id, card_to_move):
     return True
 
 
-def _move_card_to_no_intermediates(
+def _move_card_to_no_splits(
     board: Board, source_id, target_id, card_to_move
 ) -> list[Move]:
     """
@@ -1022,58 +1025,64 @@ def _move_card_to_no_intermediates(
 
 def move_card_to_top(board: Board, source_id, target_id, card_id) -> list[Move]:
     """Produces a series of moves which lead to moving one specific card to the top of another stack through reversible moves"""
+    func_name = "move_card_to_top"
     moves: list[Move] = []
     cloned_board = board.clone()
 
     source_stack = cloned_board.get_stack(source_id)
     target_stack = cloned_board.get_stack(target_id)
 
+    logging.debug(f"{func_name}: Attempting to move card from stack {source_id} to stack {target_id}, card index: {card_id}")
+
     # Ensure the card to move is within the stack
     if card_id >= len(source_stack.cards):
-        return moves
+        logging.error(f"{func_name}: Card index out of stack bounds")
+        raise ValueError("Card index out of stack")
     if not target_stack.can_stack(source_stack.cards[card_id]):
+        logging.debug(f"{func_name}: Target stack cannot accept the card, no moves made")
         return moves
 
     while True:
-        cards_to_move = source_stack.cards[card_id:]
-        sequences = cards_to_sequences(cards_to_move)
-        degrees_of_freedom = dof_board(cloned_board)
-
-        # Move directly if degrees of freedom allow
         if _can_be_moved_directly(cloned_board, source_id, target_id, card_id):
-            direct_moves = _move_card_to_no_intermediates(
+            direct_moves = _move_card_to_no_splits(
                 cloned_board, source_id, target_id, card_id
             )
             moves.extend(direct_moves)
+            logging.debug(f"{func_name}: Card moved directly with moves: {direct_moves}")
+            break
+
+        if card_id >= len(source_stack.cards) - 1:
+            logging.debug(f"{func_name}: No more cards to move, exiting loop")
+            moves = []
             break
 
         # Attempt reversible moves with and without considering splits
-        for consider_split in [False, True]:
-            reversible_moves = _reversible_move_away_from_stack(
-                cloned_board,
-                sequences,
-                source_id,
-                [source_id],
-                consider_split=consider_split,
-            )
+        reversible_moves = _reversible_move_away_from_stack(
+            cloned_board,
+            source_id,
+            card_id+1,
+            [source_id],
+        )
 
+        if reversible_moves:
+            logging.debug(f"{func_name}: Reversible moves found: {reversible_moves}")
+            moves.extend(reversible_moves)
+            cloned_board.execute_moves(reversible_moves)
+        else:
+           logging.debug(f"{func_name}: No reversible moves found, attempting to free up space")
+           # If no reversible moves are found, attempt to free up space
+           freeing_moves = free_stack(
+               cloned_board, ignored_stacks=[source_id, target_id]
+           )
+           if not freeing_moves:
+               logging.debug(f"{func_name}: No moves to free up space, exiting")
+               moves = []
+               break
+           logging.debug(f"{func_name}: Freeing moves found: {freeing_moves}")
+           moves.extend(freeing_moves)
+           cloned_board.execute_moves(freeing_moves)
 
-            if reversible_moves:
-                moves.extend(reversible_moves)
-                cloned_board.execute_moves(reversible_moves)
-                break
-
-        if not reversible_moves:
-            # If no reversible moves are found, attempt to free up space
-            freeing_moves = free_stack(
-                cloned_board, ignored_stacks=[source_id, target_id]
-            )
-            if not freeing_moves:
-                moves = []
-                break
-            moves.extend(freeing_moves)
-            cloned_board.execute_moves(freeing_moves)
-
+    logging.debug(f"{func_name}: Total moves made: {moves}")
     return moves
 
 
@@ -1211,7 +1220,7 @@ def find_placement_index_for_card(
     )
     if not accessible_cards:
         logging.debug(f"find_placement_index_for_card: No accessible cards found")
-        return -1 if stack.is_empty() else None
+        return None
 
     accessible_cards.reverse()
 
@@ -1223,19 +1232,27 @@ def find_placement_index_for_card(
 
     return None
 
+def find_partially_stackable(
+    board: Board, sequence: list[Card], ignored_stacks: list[int]
+) -> tuple[int, int]:
+    """
+    Finds a stack where a part of the given sequence can be stacked, starting from the second card in the sequence.
 
-def _find_stack_which_can_stack(
-    board: Board, card: Card, ignored_stacks: list[int] = []
-) -> int:
-    target_stack = -1
+    Parameters:
+    - board (Board): The current state of the board.
+    - sequence (list[Card]): The sequence of cards to check for partial stackability.
+    - ignored_stacks (list[int]): Indices of stacks to be ignored during the search.
 
-    for id, stack in enumerate(board.stacks):
-        if not id in ignored_stacks and not stack.is_empty():
-            if stack.can_stack(card):
-                target_stack = id
-                break
+    Returns:
+    - tuple[int, int]: A tuple containing the index of the stack where the sequence can be partially stacked and the index within the sequence where stacking can start. Returns (-1, -1) if no such stack is found.
+    """
+    for sequence_index, card in enumerate(sequence, start=1): # start=1 to skip the top card
+        target_stack = find_stack_to_move_sequence(board, card, ignored_stacks)
+        if target_stack:
+            return target_stack, sequence_index
 
-    return target_stack
+    return (-1, -1)
+
 
 
 def find_stack_to_move_sequence(

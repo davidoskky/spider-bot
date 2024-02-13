@@ -1,8 +1,10 @@
 import logging
+
 import pytest
-from moves_exploration import _move_card_to_no_intermediates, free_stack
-from spiderSolitaire import Board, Stack
+
 from deck import Card, Deck
+from moves_exploration import _move_card_to_no_splits, free_stack
+from spiderSolitaire import Board, Stack
 
 
 def test_empty_board():
@@ -157,7 +159,7 @@ def test_identified_1_intermediate():
     stacks = tuple(stacks)
     board = Board(stacks=stacks, deck=Deck(), completed_stacks=0)
 
-    result = _move_card_to_no_intermediates(board, 2, 0, 0)
+    result = _move_card_to_no_splits(board, 2, 0, 0)
     logging.debug(f"{result}")
 
     for move in result:
