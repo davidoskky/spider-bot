@@ -449,6 +449,7 @@ def move_cards_removing_interfering(
         return moves
 
     # Clear any cards covering the target position
+    # Maybe this should be done by sequence as well
     clearance_moves = _move_stacked_to_temporary_position(
         cloned_board, target_stack_id, target_card_id + 1
     )
@@ -838,20 +839,30 @@ def _move_stacked_to_temporary_position(
     - The choice of the temporary stack is determined by an internal strategy that may vary based on the board's
       current state and the specific rules or constraints of the game being played.
     """
+    logging.debug(f"_move_stacked_to_temporary_position: attempting to move card {card_index} from stack {stack_id}")
+    moves = []
     cloned_board = board.clone()
     stack = cloned_board.get_stack(stack_id)
     if card_index >= len(stack.cards):
+        logging.debug(f"_move_stacked_to_temporary_position: card index out of bounds")
         return []
 
-    temporary_stack_id = find_stack_to_move_sequence(
-        cloned_board, stack.cards[card_index]
+    temporary_stack_ids = find_stacks_to_move_card(
+        cloned_board, stack.cards[card_index], ignore_empty=True
     )
-    if temporary_stack_id is None:
-        return []
+    if not temporary_stack_ids:
+        temporary_stack_ids = find_stacks_to_move_card(
+            cloned_board, stack.cards[card_index], ignore_empty=False
+        )
 
-    logging.debug(f"_move_stacked_to_temporary_position: stack = {stack_id}, card = {card_index}, temporary = {temporary_stack_id}")
-    moves = move_card_to_top(cloned_board, stack_id, temporary_stack_id, card_index)
- 
+    logging.debug(f"_move_stacked_to_temporary_position: plausible stacks = {temporary_stack_ids}")
+
+    for temporary_stack_id in temporary_stack_ids:
+        logging.debug(f"_move_stacked_to_temporary_position: stack = {stack_id}, card = {card_index}, temporary = {temporary_stack_id}")
+        moves = move_card_to_top(cloned_board, stack_id, temporary_stack_id, card_index)
+        if moves:
+            break
+     
     logging.debug(f"_move_stacked_to_temporary_position: moves = {moves}")
 
     return moves
@@ -1253,6 +1264,16 @@ def find_partially_stackable(
 
     return (-1, -1)
 
+
+def find_stacks_to_move_card(board: Board, card: Card, ignored_stacks=[], ignore_empty=False) -> list[int]:
+    """Return a list of stack id on which a given card may be moved"""
+    suitable_stacks = []
+    for stack_id, stack in enumerate(board.stacks):
+        if stack_id in ignored_stacks or (ignore_empty and stack.is_empty()):
+            continue
+        if stack.can_stack(card):
+            suitable_stacks.append(stack_id)
+    return suitable_stacks
 
 
 def find_stack_to_move_sequence(
