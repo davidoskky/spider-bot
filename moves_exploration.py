@@ -1024,13 +1024,14 @@ def _move_card_to_no_splits(
     moves: list[Move] = []
     cloned_board = board.clone()
     source_stack = cloned_board.get_stack(source_id)
+    target_is_empty = cloned_board.get_stack(target_id).is_empty()
     sequences = cards_to_sequences(source_stack.cards[card_to_move:])
-    logging.debug(f"_move_card_to_no_intermediates: sequences = {sequences}")
+    logging.debug(f"_move_card_to_no_splits: sequences = {sequences}")
 
     if not _can_be_moved_directly(board,source_id,target_id, card_to_move):
         return moves
 
-    if len(sequences) > 1:
+    if len(sequences) > 1 and not target_is_empty:
         stack_to_stack_moves = _optimal_stacked_reversible_movement(
             cloned_board, source_id, len(sequences) - 1
         )
@@ -1040,10 +1041,25 @@ def _move_card_to_no_splits(
             move = Move(start, dest, card_id)
             cloned_board.move_by_index(*move)
             moves.append(move)
+    if len(sequences) >1 and target_is_empty:
+        stack_to_stack_moves = _optimal_stacked_reversible_movement(
+            cloned_board, source_id, len(sequences), final_stack=target_id
+        )
+        for move_set in stack_to_stack_moves:
+            start, dest = move_set
+            card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+            move = Move(start, dest, card_id)
+            cloned_board.move_by_index(*move)
+            moves.append(move)
 
-    move = Move(source_id, target_id, card_to_move)
-    moves.append(move)
-    logging.debug(f"_move_card_to_no_intermediates: moves = {moves}")
+    if len(sequences) == 1 and target_is_empty:
+        move = Move(source_id, target_id, card_to_move)
+        moves.append(move)
+
+    if not target_is_empty:
+        move = Move(source_id, target_id, card_to_move)
+        moves.append(move)
+    logging.debug(f"_move_card_to_no_splits: moves = {moves}")
     return moves
 
 
@@ -1109,8 +1125,32 @@ def move_card_to_top(board: Board, source_id, target_id, card_id) -> list[Move]:
     logging.debug(f"{func_name}: Total moves made: {moves}")
     return moves
 
-
 def _optimal_stacked_reversible_movement(
+    board: Board,
+    source_stack_id: int,
+    amount_of_sequences: int,
+    final_stack: int|None = None,
+):
+    """
+    Generates an optimal sequence of moves to free one stack given a number of empty stacks,
+    ensuring that the number of moves starting from the source stack matches the amount of sequences.
+    It does not consider moving cads on top of others, it only uses the empty stacks.
+
+    :param board: The current state of the Spider Solitaire game.
+    :param source_stack_id: ID of the source stack from which cards are to be moved.
+    :param amount_of_sequences: Number of sequences in the source stack to be moved.
+    :param final_stack: Ensure that the last move ends on this stack or it is not used in any move
+    :return: List of tuples representing the moves, where each tuple is (source_stack_id, target_stack_id).
+    """
+    moves = _optimal_stacked_reversible_movement_sets(board, source_stack_id, amount_of_sequences)
+    logging.debug(f"_optimal_stacked_reversible_movement: moves = {moves}")
+    if final_stack is not None:
+        moves = _translate_optimal_moves(moves, final_stack)
+        logging.debug(f"_optimal_stacked_reversible_movement: moves after translation = {moves}")
+    return moves
+
+
+def _optimal_stacked_reversible_movement_sets(
     board: Board,
     source_stack_id: int,
     amount_of_sequences: int,
@@ -1123,6 +1163,7 @@ def _optimal_stacked_reversible_movement(
     :param board: The current state of the Spider Solitaire game.
     :param source_stack_id: ID of the source stack from which cards are to be moved.
     :param amount_of_sequences: Number of sequences in the source stack to be moved.
+    :param final_stack: Ensure that the last move ends on this stack or it is not used in any move
     :return: List of tuples representing the moves, where each tuple is (source_stack_id, target_stack_id).
     """
     initial_empty_stacks = board.count_empty_stacks()
@@ -1169,7 +1210,42 @@ def _optimal_stacked_reversible_movement(
         moves.append((empty_stacks[1], empty_stacks[2]))
         moves.append((source_stack_id, empty_stacks[1]))
 
+
     return moves
+
+def _translate_optimal_moves(moves: list[tuple[int, int]], target_id: int) -> list[tuple[int, int]]:
+    """
+    Translates a sequence of moves so that the last move becomes goes to the desired target_id
+    and intermediate stack IDs are shuffled accordingly.
+
+    :param moves: Initial sequence of moves as a list of tuples (source_stack, target_stack).
+    :param source_id: ID of the source stack.
+    :param target_id: ID of the target stack.
+    :return: Translated sequence of moves.
+    """
+    if not moves:
+        return moves
+
+    # If no move is going to the target id, no need to translate
+    if target_id not in [move[-1] for move in moves]:
+        return moves
+
+    translated_moves = []
+    original_final_stack = moves[-1][1]
+
+    # Translate each move in the sequence
+    for move in moves:
+        src, dst = move
+        if dst == original_final_stack:
+            new_dst = target_id
+        elif dst == target_id:
+            new_dst = original_final_stack
+        else:
+            new_dst = dst
+
+        translated_moves.append((src, new_dst))
+
+    return translated_moves
 
 
 def cards_to_sequences(cards: list[Card]) -> list[list[Card]]:
