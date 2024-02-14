@@ -295,13 +295,14 @@ def find_move_increasing_stacked_length_manual(board: Board) -> list[Move]:
 
         for card_index in range(first_card_to_consider, len(source_stack.cards)):
             card = source_stack.cards[card_index]
+            logging.debug(f"find_move_increasing_stacked_length_manual: considering card {card}")
             if card.rank == 14: # The king cannot be moved reversibly
                 continue
             # Do not try moving cards which are in a sequence
             if source_stack.is_in_sequence(card_index):
+                logging.debug(f"find_move_increasing_stacked_length_manual: skipping card in sequence")
                 continue
 
-            logging.debug(f"find_move_increasing_stacked_length_manual: considering card {card}")
 
             for target_stack_index, target_stack in enumerate(board.stacks):
                 # Don't consider moving to empty stack, this check should not be necessary, but just in case
@@ -313,6 +314,7 @@ def find_move_increasing_stacked_length_manual(board: Board) -> list[Move]:
                 )
                 if target_card_index is None:
                     continue
+                target_card_index -= 1
 
                 logging.debug(
                     f"find_move_increasing_stacked_length: target_card_ind = {target_card_index}"
@@ -401,21 +403,21 @@ def is_stacked_improved(
     source_stack: Stack, target_stack: Stack, source_card_id: int, target_card_id: int
 ) -> bool:
     """
-    Determines if moving a card to a target index in a different stack results in a longer stacked by merging
-    accessible sequences from the source and target stacks.
+    Determines if moving a card or sequence of cards starting from a given index in the source stack to a target index in the target stack results in a valid and improved stacking by merging accessible sequences from both stacks.
 
-    :param source_stack: The stack from which the card is moved.
-    :param target_stack: The stack to which the card is moved.
-    :param card: The card being moved.
-    :param target_index: The target position in the target stack.
-    :return: True if the sequence is improved, False otherwise.
+    :param source_stack: The stack from which cards are moved.
+    :param target_stack: The stack to which cards are moved.
+    :param source_card_id: The starting index of the card(s) being moved in the source stack.
+    :param target_card_id: The target position in the target stack for the bottom-most card being moved.
+    :return: True if the resulting sequence in the target stack is valid and longer than the original, False otherwise.
     """
 
     if source_card_id < source_stack.first_card_of_valid_stacked() or target_card_id < target_stack.first_card_of_valid_stacked():
         raise ValueError("Invalid card accessed")
     source_sequence = source_stack.cards[source_card_id:]
-    target_sequence = target_stack.cards[target_stack.first_card_of_valid_stacked() : target_card_id]
-    remaining_source = source_stack.cards[source_stack.first_card_of_valid_stacked() : source_card_id]
+    target_sequence = target_stack.cards[target_stack.first_card_of_valid_stacked() : target_card_id + 1]
+    remaining_source = source_stack.cards[source_stack.first_card_of_valid_stacked() : source_card_id + 1]
+    leaving_target =target_stack.cards[target_card_id+1 : ]
 
     logging.debug(f"is_stacked_improved: source_seq = {source_sequence}, target_sequence = {target_sequence}")
 
@@ -425,6 +427,12 @@ def is_stacked_improved(
     if not target_sequence:
         logging.debug(f"is_stacked_improved: No target sequence")
         return False
+    if source_stack.get_stacked()[0].rank >= target_stack.get_stacked()[0].rank:
+        logging.debug(f"is_stacked_improved: The source stack starts with a higher rank")
+        return False
+    if target_stack.is_in_sequence(target_card_id):
+        logging.debug(f"is_stacked_improved: The target card is in a sequence")
+        return False
 
     if not target_sequence[-1].can_stack(source_sequence[0]):
         logging.debug(f"is_stacked_improved: Cannot stack")
@@ -432,7 +440,7 @@ def is_stacked_improved(
 
     logging.debug(f"is_stacked_improved: len target_seq = {len(target_sequence)}, len remaining_source = {len(remaining_source)}")
 
-    return len(target_sequence) > len(remaining_source)
+    return len(source_sequence) > len(leaving_target)
 
 
 # TODO: This is not correct it should be sequence length can be increased and consider
@@ -1390,6 +1398,19 @@ def find_placement_index_for_card(
     :return: The position (index) in the stack where the card can be placed according to the stacking rules.
              Returns None if there is no valid position for the card in this stack.
     """
+    if stack.is_empty():
+        logging.debug("find_placement_index_for_card: Stack is empty.")
+        return 0
+
+    # first_accessible_card_id = stack.first_card_of_valid_stacked()
+    # for i in range(len(stack.cards) -1, first_accessible_card_id - 1, -1):
+    #     accessible_card = stack.cards[i]
+    #
+    #     if not should_sequence and accessible_card.can_stack(card):
+    #         return i
+    #     elif should_sequence and accessible_card.can_sequence(card):
+    #         return i 
+    # return None
     accessible_cards = stack.get_stacked()
     logging.debug(
         f"find_placement_index_for_card: accessible_cards = {accessible_cards}"
@@ -1397,15 +1418,15 @@ def find_placement_index_for_card(
     if not accessible_cards:
         logging.debug(f"find_placement_index_for_card: No accessible cards found")
         return None
-
+  
     accessible_cards.reverse()
-
+  
     for i, accessible_card in enumerate(accessible_cards):
         if not should_sequence and accessible_card.can_stack(card):
             return len(stack.cards) - i
         elif should_sequence and accessible_card.can_sequence(card):
             return len(stack.cards) - i - 1
-
+  
     return None
 
 def find_partially_stackable(
