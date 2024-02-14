@@ -276,45 +276,64 @@ def find_move_increasing_stacked_length_manual(board: Board) -> list[Move]:
     Finds a set of reversible moves leading to a board position with an increased stacked length,
     without reducing the sequence length or the number of empty stacks.
 
+    The objective of this function is to move cards towards stacks that start on a higher card.
+    The rationale is that having long sequences starting on a king leaves other stacks more free
+    of other movement options.
+    This is not a move-wise cheap strategy but it should be safer.
+
     Parameters:
     - board (Board): The current state of the board.
 
     Returns:
     - List[Move]: A list of moves that result in an improved board position, or an empty list if no such move exists.
     """
-    for source_stack_index, source_stack in enumerate(board.stacks):
-        if source_stack.is_empty():
+    # TODO: Not strictly necessary, but this can be made more efficient, also move-wise by first sorting the target stacks by first accessible card
+    # This should also favor moving to stacks where there is a king on the ground
+    for target_stack_index, target_stack in enumerate(board.stacks):
+        if target_stack.is_empty():
             continue
 
-        first_card_to_consider = source_stack.first_card_of_valid_stacked()
-        if first_card_to_consider > 0:
-            # Don't consider the card if it is stacked over a covered one
-            first_card_to_consider += 1
+        target_stack_rank = target_stack.cards[target_stack.first_card_of_valid_stacked()].rank
 
-        logging.debug(f"find_move_increasing_stacked_length_manual: considering cards = {source_stack.cards[first_card_to_consider:]}")
-
-        for card_index in range(first_card_to_consider, len(source_stack.cards)):
-            card = source_stack.cards[card_index]
-            logging.debug(f"find_move_increasing_stacked_length_manual: considering card {card}")
-            if card.rank == 14: # The king cannot be moved reversibly
-                continue
-            # Do not try moving cards which are in a sequence
-            if source_stack.is_in_sequence(card_index):
-                logging.debug(f"find_move_increasing_stacked_length_manual: skipping card in sequence")
+        for source_stack_index, source_stack in enumerate(board.stacks):
+            if source_stack.is_empty() or target_stack_index == source_stack_index:
                 continue
 
+            source_stack_rank = source_stack.cards[source_stack.first_card_of_valid_stacked()].rank
+            # Skip if moving towards a target stack which is lower ranking
+            if source_stack_rank > target_stack_rank:
+                logging.debug(f"find_move_increasing_stacked_length_manual: Target stack rank lower than shource, breaking target {target_stack_rank}, source {source_stack_rank}")
+                continue
 
-            for target_stack_index, target_stack in enumerate(board.stacks):
-                # Don't consider moving to empty stack, this check should not be necessary, but just in case
-                if target_stack_index == source_stack_index or target_stack.is_empty():
+            first_card_to_consider = source_stack.first_card_of_valid_stacked()
+            if first_card_to_consider > 0:
+                # Don't consider the card if it is stacked over a covered one
+                first_card_to_consider += 1
+
+
+            logging.debug(f"find_move_increasing_stacked_length_manual: considering cards = {source_stack.cards[first_card_to_consider:]}")
+
+            for card_index in range(first_card_to_consider, len(source_stack.cards)):
+                card = source_stack.cards[card_index]
+                logging.debug(f"find_move_increasing_stacked_length_manual: considering card {card}")
+                if card.rank == 14: # The king cannot be moved reversibly
+                    continue
+                # Do not try moving cards which are in a sequence
+                if source_stack.is_in_sequence(card_index):
+                    logging.debug(f"find_move_increasing_stacked_length_manual: skipping source card in sequence")
                     continue
 
-                target_card_index = find_placement_index_for_card(
+                card_covering_target_index = find_placement_index_for_card(
                     card, target_stack, should_sequence=False
                 )
-                if target_card_index is None:
+                if card_covering_target_index is None:
                     continue
-                target_card_index -= 1
+
+                target_card_index = card_covering_target_index - 1
+
+                if card_covering_target_index < len(target_stack.cards) and target_stack.is_in_sequence(target_card_index):
+                    logging.debug(f"find_move_increasing_stacked_length_manual: skipping target card in sequence")
+                    continue
 
                 logging.debug(
                     f"find_move_increasing_stacked_length: target_card_ind = {target_card_index}"
