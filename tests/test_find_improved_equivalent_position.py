@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from deck import Card, Deck
-from moves_exploration import find_improved_equivalent_position
+from moves_exploration import find_improved_equivalent_position, free_stack
 from spiderSolitaire import Board, Stack
 
 
@@ -252,6 +252,7 @@ def test_should_move_start_of_stacked():
     ), "Expected to find at least one improved equivalent position but got an empty list"
     assert len(result) == 2
 
+
 def test_should_move_start_of_stack():
     """
     Stack 0: 10♥ 9♥ 8♥ 7♠
@@ -317,7 +318,6 @@ def test_should_not_move_equivalent_start_of_stack():
     stacks[1] = Stack([])
     stacks[2] = Stack([Card(1, 0), Card(10, 1)])
 
-
     stacks[0].first_visible_card = 0
     stacks[2].first_visible_card = 1
 
@@ -327,3 +327,40 @@ def test_should_not_move_equivalent_start_of_stack():
     result = find_improved_equivalent_position(board)
 
     assert result == [], "Should not move"
+
+
+def test_error_14_02():
+    """
+    Stack 0: 
+    Stack 1: XX XX 1♠ 3♣ 2♣ 1♣ 9♦ 8♦ 11♠ 10♣ 9♣ 8♣ 7♣ 6♣ 
+    Stack 2: XX XX XX XX XX 13♠ 12♠ 11♣ 10♠ 9♦ 8♦ 7♦ 6♦ 3♣ 2♣ 1♣ 4♣ 3♦ 2♦ 1♦ 
+    Stack 3: XX 5♦ 4♣ 3♣ 2♣ 1♦ 
+    Stack 4: XX XX 5♣ 8♠ 7♥ 6♣ 5♣ 4♣ 13♦ 12♦ 11♠ 10♠ 9♠ 8♠ 7♠ 6♥ 5♥ 4♣ 3♥ 2♣ 
+    Stack 5: 
+    Stack 6: 
+    Stack 7: 12♣ 11♦ 10♣ 9♣ 8♣ 7♠ 6♣ 
+    Stack 8: 13♠ 12♠ 11♠ 10♠ 9♠ 3♦ 11♦ 10♦ 9♥ 
+    Stack 9: 6♦ 
+    """
+    stacks = [Stack([]) for _ in range(10)]
+
+    stacks[1] = Stack([Card(1, 0)] + [Card(1, 3), Card(3, 2), Card(2, 2), Card(1, 2), Card(9, 1), Card(8, 1), Card(11, 3), Card(10, 2), Card(9, 2), Card(8, 2), Card(7, 2), Card(6, 2)])
+    stacks[2] = Stack([Card(1, 0)] + [Card(13, 3), Card(12, 3), Card(11, 2), Card(10, 3), Card(9, 1), Card(8, 1), Card(7, 1), Card(6, 1), Card(3, 2), Card(2, 2), Card(1, 2), Card(4, 2), Card(3, 1), Card(2, 1), Card(1, 1)])
+    stacks[3] = Stack([Card(1, 0)] + [Card(5, 1), Card(4, 2), Card(3, 2), Card(2, 2), Card(1, 1)])
+    stacks[4] = Stack([Card(1, 0)] + [Card(5, 2), Card(8, 3), Card(7, 0), Card(6, 2), Card(5, 2), Card(4, 2)] + [Card(13, 1), Card(12, 1), Card(11, 3), Card(10, 3), Card(9, 3), Card(8, 3), Card(7, 3), Card(6, 0), Card(5, 0), Card(4, 2), Card(3, 0), Card(2, 2)])
+    stacks[7] = Stack([Card(12, 2), Card(11, 1), Card(10, 2), Card(9, 2), Card(8, 2), Card(7, 3), Card(6, 2)])
+    stacks[8] = Stack([Card(13, 3), Card(12, 3), Card(11, 3), Card(10, 3), Card(9, 3), Card(3, 1), Card(11, 1), Card(10, 1), Card(9, 0)])
+    stacks[9] = Stack([Card(6, 1)])
+
+    for stack in stacks:
+        hidden_cards = sum(
+            1 for card in stack.cards if card.rank == 1 and card.suit == 0
+        )
+        stack.first_visible_card = hidden_cards
+
+    # Initialize the board with the defined stacks
+    board = Board(stacks=tuple(stacks), deck=Deck(), completed_stacks=0)
+
+    result = find_improved_equivalent_position(board)
+
+    assert result != [], "Should move 7 to 4"

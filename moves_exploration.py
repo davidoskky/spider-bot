@@ -1346,7 +1346,14 @@ def _translate_optimal_moves(moves: list[tuple[int, int]], target_id: int) -> li
         else:
             new_dst = dst
 
-        translated_moves.append((src, new_dst))
+        if src == original_final_stack:
+            new_src = target_id
+        elif src == target_id:
+            new_src = original_final_stack
+        else:
+            new_src = src
+
+        translated_moves.append((new_src, new_dst))
 
     return translated_moves
 
