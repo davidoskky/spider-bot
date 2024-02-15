@@ -3,8 +3,11 @@ import logging
 import pytest
 
 from deck import Card, Deck
-from moves_exploration import find_move_increasing_stacked_length_manual
+from moves_exploration import (find_improved_equivalent_position,
+                               find_move_increasing_stacked_length_manual,
+                               free_stack)
 from spiderSolitaire import Board, Stack
+from util_tests import generate_board_from_string
 
 
 def test_should_move_start_of_stack():
@@ -131,3 +134,42 @@ def test_should_not_move_from_ground():
     result = find_move_increasing_stacked_length_manual(board)
 
     assert result != [], "No valid move"
+
+
+def test_raise_error_15_02():
+    board = generate_board_from_string(
+        """Stack 0: XX XX XX XX XX 6♥ 5♣ 5♦ 4♦ 3♦ 12♥ 11♠ 3♥ 
+Stack 1: XX 13♦ 12♦ 11♦ 12♦ 
+Stack 2: XX XX 7♦ 6♥ 5♥ 4♥ 3♦ 
+Stack 3: XX XX XX XX 1♣ 9♥ 8♣ 2♠ 1♠ 
+Stack 4: XX 8♥ 13♣ 12♠ 
+Stack 5: XX XX XX 13♣ 12♣ 11♣ 10♦ 9♠ 8♠ 
+Stack 6: 6♦ 5♣ 4♣ 3♣ 2♣ 1♣ 
+Stack 7: XX XX XX XX 2♥ 1♦ 1♥ 7♥ 
+Stack 8: XX XX XX 13♥ 12♥ 11♦ 10♠ 9♠ 8♠ 9♦ 8♦ 
+Stack 9: XX XX XX XX 5♠ 3♠ 2♠ 1♦ 2♦ 8♣ 7♠ 6♠ 
+"""
+    )
+    result = find_move_increasing_stacked_length_manual(board)
+
+    assert result != []
+
+
+def test_should_not_move_sequence():
+    board = generate_board_from_string(
+        """Stack 0: XX XX XX 1♠ 1♥ 
+Stack 1: XX XX XX XX XX 5♣ 8♦ 7♣ 6♥ 1♦ 8♥ 
+Stack 2: XX XX XX XX XX 13♥ 12♣ 11♣ 10♦ 13♥ 12♦ 4♦ 7♠ 6♥ 5♠ 
+Stack 3: XX XX XX XX XX 2♥ 1♦ 13♠ 12♠ 
+Stack 4: XX XX XX XX 7♦ 13♣ 12♥ 
+Stack 5: XX 10♦ 4♥ 3♥ 2♠ 1♣ 10♣ 9♥ 8♦ 
+Stack 6: XX 3♦ 
+Stack 7: XX XX 7♣ 13♦ 10♣ 
+Stack 8: XX XX XX XX 5♥ 13♣ 6♦ 5♣ 
+Stack 9: XX XX XX XX 10♥ 9♥ 8♠ 7♠ 6♠ 12♣ 11♦ 10♠ 9♠ 
+"""
+    )
+
+    result = find_move_increasing_stacked_length_manual(board)
+
+    assert result == [], "The sequence should not be split"
