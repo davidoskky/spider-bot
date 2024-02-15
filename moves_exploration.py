@@ -299,10 +299,12 @@ def find_move_increasing_stacked_length_manual(board: Board) -> list[Move]:
             if source_stack.is_empty() or target_stack_index == source_stack_index:
                 continue
 
+            logging.debug(f"find_move_increasing_stacked_length_manual: Evaluating source stack {source_stack_index}")
+
             source_stack_rank = source_stack.cards[source_stack.first_card_of_valid_stacked()].rank
             # Skip if moving towards a target stack which is lower ranking
             if source_stack_rank > target_stack_rank:
-                logging.debug(f"find_move_increasing_stacked_length_manual: Target stack rank lower than shource, breaking target {target_stack_rank}, source {source_stack_rank}")
+                logging.debug(f"find_move_increasing_stacked_length_manual: Target stack {target_stack_index} rank lower than shource {source_stack_index}, breaking target {target_stack_rank}, source {source_stack_rank}")
                 continue
 
             first_card_to_consider = source_stack.first_card_of_valid_stacked()
@@ -331,7 +333,7 @@ def find_move_increasing_stacked_length_manual(board: Board) -> list[Move]:
 
                 target_card_index = card_covering_target_index - 1
 
-                if card_covering_target_index < len(target_stack.cards) and target_stack.is_in_sequence(target_card_index):
+                if card_covering_target_index < len(target_stack.cards) or target_stack.is_in_sequence(target_card_index):
                     logging.debug(f"find_move_increasing_stacked_length_manual: skipping target card in sequence")
                     continue
 
@@ -958,6 +960,7 @@ def _move_stacked_to_temporary_position(
         temporary_stack_ids = find_stacks_to_move_card(
             cloned_board, stack.cards[card_index], ignored_stacks=ignored_stacks, ignore_empty=False)
 
+        # TODO: Error if the free_stack function moves away cards from the one we are moving from
         if not temporary_stack_ids:
             clearing_moves = free_stack(cloned_board, ignored_stacks=ignored_stacks)
             if not clearing_moves:
