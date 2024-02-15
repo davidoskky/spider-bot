@@ -955,15 +955,17 @@ def _move_stacked_to_temporary_position(
         cloned_board, stack.cards[card_index], ignored_stacks=ignored_stacks, ignore_empty=True
     )
     if not temporary_stack_ids:
-        if cloned_board.count_empty_stacks() == 0:
-            clearing_moves = free_stack(cloned_board, ignored_stacks=ignored_stacks)
-            if clearing_moves:
-                cloned_board.execute_moves(clearing_moves)
-            else:
-                return []
         temporary_stack_ids = find_stacks_to_move_card(
-            cloned_board, stack.cards[card_index], ignored_stacks=ignored_stacks, ignore_empty=False
-        )
+            cloned_board, stack.cards[card_index], ignored_stacks=ignored_stacks, ignore_empty=False)
+
+        if not temporary_stack_ids:
+            clearing_moves = free_stack(cloned_board, ignored_stacks=ignored_stacks)
+            if not clearing_moves:
+                return []
+
+            cloned_board.execute_moves(clearing_moves)
+            temporary_stack_ids = find_stacks_to_move_card(
+                cloned_board, stack.cards[card_index], ignored_stacks=ignored_stacks, ignore_empty=False)
 
     logging.debug(f"_move_stacked_to_temporary_position: plausible stacks = {temporary_stack_ids}")
 
