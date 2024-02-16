@@ -173,3 +173,23 @@ Stack 9: XX XX XX XX 10♥ 9♥ 8♠ 7♠ 6♠ 12♣ 11♦ 10♠ 9♠
     result = find_move_increasing_stacked_length_manual(board)
 
     assert result == [], "The sequence should not be split"
+
+
+def test_should_not_move_sequence_2():
+    board = generate_board_from_string(
+        """Stack 0: XX XX 6♥ 
+Stack 1: XX XX XX XX XX 12♠ 11♠ 10♠ 9♠ 
+Stack 2: XX XX XX XX XX 13♦ 12♦ 11♥ 10♦ 9♦ 8♦ 7♣ 
+Stack 3: XX XX XX XX XX 4♣ 3♣ 2♣ 
+Stack 4: XX XX XX 13♥ 12♦ 11♣ 10♣ 9♣ 8♣ 7♣ 
+Stack 5: XX 6♣ 13♥ 12♥ 11♥ 10♠ 9♠ 
+Stack 6: 
+Stack 7: 4♣ 
+Stack 8: XX XX XX XX 2♠ 1♠ 9♥ 8♥ 7♥ 6♥ 5♥ 4♠ 
+Stack 9: 4♦ 3♦ 
+"""
+    )
+
+    result = find_move_increasing_stacked_length_manual(board)
+
+    assert result == [], "The sequence should not be split"
