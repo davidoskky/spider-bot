@@ -1187,6 +1187,8 @@ def _move_card_to_no_splits(
         for move_set in stack_to_stack_moves:
             start, dest = move_set
             card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+            if start == source_id and card_id < card_to_move:
+                card_id = card_to_move
             move = Move(start, dest, card_id)
             cloned_board.move_by_index(*move)
             moves.append(move)
@@ -1197,6 +1199,8 @@ def _move_card_to_no_splits(
         for move_set in stack_to_stack_moves:
             start, dest = move_set
             card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+            if start == source_id and card_id < card_to_move:
+                card_id = card_to_move
             move = Move(start, dest, card_id)
             cloned_board.move_by_index(*move)
             moves.append(move)
