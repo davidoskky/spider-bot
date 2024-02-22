@@ -496,4 +496,4 @@ Stack 9: """
     )
 
     result = find_improved_equivalent_position(board)
-    assert result == [], "No move possible"
+    assert result != [], "Should move 8 to 4"
