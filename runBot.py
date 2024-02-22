@@ -1,9 +1,10 @@
 import cProfile
-import pstats
 import io
+import pstats
 from tabnanny import verbose
-from spiderSolitaireBot import SpiderSolitaireBot
+
 from spiderSolitaire import SpiderSolitaire
+from spiderSolitaireBot import SpiderSolitaireBot
 
 bot = SpiderSolitaireBot(SpiderSolitaire())
 # print(f"Game solveable {bot.gameSolvable()}")
