@@ -123,7 +123,7 @@ def test_should_not_move_from_ground():
 
     stacks[0] = Stack([Card(9, 1), Card(8, 1), Card(7, 1)])
     stacks[1] = Stack([Card(1, 0), Card(5, 3)])
-    stacks[2] = Stack([Card(1, 0), Card(10, 3), Card(9, 2)])
+    stacks[2] = Stack([Card(1, 0), Card(10, 3), Card(9, 3)])
 
     stacks[0].first_visible_card = 0
     stacks[1].first_visible_card = 1
@@ -133,7 +133,7 @@ def test_should_not_move_from_ground():
 
     result = find_move_increasing_stacked_length_manual(board)
 
-    assert result != [], "No valid move"
+    assert result == [], "There is no valid move"
 
 
 def test_raise_error_15_02():
