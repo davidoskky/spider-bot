@@ -1225,7 +1225,8 @@ def move_card_to_top(board: Board, source_id, target_id, card_id) -> list[Move]:
 
     # Ensure the card to move is within the stack
     if card_id >= len(source_stack.cards):
-        logging.error(f"{func_name}: Card index out of stack bounds")
+        logging.error(f"{func_name}: Card index {card_id} out of stack {source_id} bounds")
+        cloned_board.display_game_state()
         raise ValueError("Card index out of stack")
     if not target_stack.can_stack(source_stack.cards[card_id]):
         logging.debug(f"{func_name}: Target stack cannot accept the card, no moves made")
