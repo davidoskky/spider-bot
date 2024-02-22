@@ -454,12 +454,14 @@ def is_sequence_improved(
     if not target_sequence:
         return False
 
-    source_pos_from_end = len(source_sequence) - source_sequence.index(source_card)
-    target_pos_from_start = target_sequence.index(target_card) + 1
+    logging.debug(f"is_sequence_improved: source card: {source_card} source: {source_sequence}, target = {target_sequence}")
 
-    combined_length = source_pos_from_end + target_pos_from_start
+    target_rank_higher = target_sequence[0].rank > source_sequence[0].rank
+    source_not_in_target = source_card.rank < target_sequence[-1].rank
 
-    return combined_length > max(len(target_sequence), len(source_sequence))
+    logging.debug(f"is_sequence_improved: target rank higher: {target_rank_higher}, source not in target = {source_not_in_target}")
+
+    return target_rank_higher and source_not_in_target
 
 def is_stacked_improved(
     source_stack: Stack, target_stack: Stack, source_card_id: int, target_card_id: int
