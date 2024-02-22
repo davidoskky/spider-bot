@@ -209,6 +209,47 @@ def find_progressive_actions(board: Board):
         max_depth=6,
     )
 
+def find_progressive_actions_manual(board: Board) -> list[list[Move]]:
+    """
+    Return a set of paths which lead to discovering a card which was previously not stacked.
+    The last move is the one discovering the card.
+    """
+    paths : list[list[Move]] = []
+
+    for source_stack_index, source_stack in enumerate(board.stacks):
+        if source_stack.is_empty():
+            continue
+        first_stacked_card_id = source_stack.first_card_of_valid_stacked()
+
+        # Ignore stacks resting on the board, nothing to be discovered there
+        if first_stacked_card_id == 0:
+            continue
+        print(f"find_progressive_actions_manual: source: {source_stack_index}, card {first_stacked_card_id}")
+
+        card_to_move = board.get_card(source_stack_index, first_stacked_card_id)
+
+        for target_stack_index, target_stack in enumerate(board.stacks):
+            if source_stack_index == target_stack_index:
+                continue
+
+            target_card_index = find_placement_index_for_card(
+                    card_to_move, target_stack, should_sequence=False
+                )
+
+            if target_card_index is None:
+                continue
+
+            moves = move_card_to_top(
+                board, source_stack_index, target_stack_index, first_stacked_card_id
+            )
+            if moves:
+                paths.append(moves)
+
+    print(paths)
+    return paths
+
+
+
 def find_improved_equivalent_position(board: Board) -> list[Move]:
     """
     Finds a set of reversible moves leading to an improved equivalent position for a card within the board by moving it to a different stack
