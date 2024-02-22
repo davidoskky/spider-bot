@@ -479,3 +479,21 @@ Stack 9: 3♣ 2♣ 1♣ 13♥ 12♥ 11♥ 10♠ 9♠ 8♠ 7♠ 6♦ """
 
     result = find_improved_equivalent_position(board)
     assert result != [], "Should move 0 to 6"
+
+
+def test_error_23():
+    board = generate_board_from_string(
+        """Stack 0: XX XX XX 3♥ 
+Stack 1: XX XX XX XX 11♦ 
+Stack 2: 
+Stack 3: 13♥ 12♥ 11♣ 10♣ 9♦ 8♦ 
+Stack 4: XX XX XX 7♦ 6♥ 
+Stack 5: XX XX 8♠ 7♠ 6♠ 5♠ 4♠ 3♠ 2♠ 
+Stack 6: 12♠ 11♠ 
+Stack 7: XX XX XX XX 12♥ 11♠ 10♥ 9♥ 8♥ 7♥ 6♥ 5♣ 4♣ 3♣ 
+Stack 8: XX XX XX 8♠ 7♣ 6♦ 5♦ 4♠ 3♦ 
+Stack 9: """
+    )
+
+    result = find_improved_equivalent_position(board)
+    assert result == [], "No moves?"
