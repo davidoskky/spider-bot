@@ -706,7 +706,7 @@ def _generate_unique_index_pairs(amount_of_stacks):
                 yield source_index, target_index
 
 
-def get_top_cards_board(board: Board, ignored_stacks: list[int]) -> list[Card]:
+def get_top_cards_board(board: Board, ignored_stacks: list[int]= []) -> list[Card]:
     """
     Retrieves the top card from each stack in the board, excluding specified stacks and empty ones.
 
@@ -1031,42 +1031,54 @@ def _move_stacked_to_temporary_position(
 
     return moves
 
-def free_stack(board: Board, ignored_stacks: list[int] = []) -> list[Move]:
+def free_stack(board: Board, ignored_stacks: list[int] = [], stacks_not_to_move_to = []) -> list[Move]:
     moves: list[Move] = []
     cloned_board = board.clone()
     initial_empty_stacks = cloned_board.count_empty_stacks()
 
-    stack_to_free_id = _select_stack_to_free(cloned_board, ignored_stacks)
-    if stack_to_free_id is None:
+    stacks_to_free_ids = _select_stacks_to_free(cloned_board)
+
+    if not stacks_to_free_ids:
         logging.debug(f"free_stack: No stack can be freed")
         return moves
 
-    logging.debug(f"Stack to free = {stack_to_free_id}")
+    for stack_id in stacks_to_free_ids:
+        if stack_id in ignored_stacks:
+            continue
 
-    stack_to_free = cloned_board.stacks[stack_to_free_id]
-    target_stack_id = find_stack_to_move_sequence(
-        cloned_board, stack_to_free.cards[0], ignored_stacks, ignore_empty=True
-    )
+        logging.debug(f"Trying to free stack = {stack_id}")
 
-    if target_stack_id is None:
-        logging.debug("free_stack: No target stack found, cannot move the sequence")
-        return moves
+        target_stack_id = find_stack_to_move_sequence(
+            cloned_board, board.get_card(stack_id, 0), ignored_stacks, ignore_empty=True
+        )
 
-    moves = move_card_to_top(board, stack_to_free_id, target_stack_id, 0)
+        if target_stack_id is None or target_stack_id in stacks_not_to_move_to:
+            logging.debug("free_stack: No target stack found, cannot move the sequence")
+            continue
 
-    logging.debug(f"free_stack: moves = {moves}")
-    if not moves:
-        ignored_stacks.append(stack_to_free_id)
-        return free_stack(board, ignored_stacks = ignored_stacks)
+        temp_moves = move_card_to_top(board, stack_id, target_stack_id, 0)
 
-    cloned_board.execute_moves(moves)
+        logging.debug(f"free_stack: temp_moves = {temp_moves}")
 
-    while cloned_board.count_empty_stacks() <= initial_empty_stacks:
-        more_moves = free_stack(cloned_board, ignored_stacks)
-        if not more_moves:
-            return []
-        moves.extend(more_moves)
-        cloned_board.execute_moves(more_moves)
+        if not temp_moves:
+            continue
+
+        cloned_board.execute_moves(temp_moves)
+        plausible_moves = []
+        plausible_moves.extend(temp_moves)
+
+        while cloned_board.count_empty_stacks() <= initial_empty_stacks:
+            more_moves = free_stack(cloned_board, ignored_stacks)
+            if not more_moves:
+                plausible_moves = []
+                cloned_board = board.clone()
+                break
+            plausible_moves.extend(more_moves)
+            cloned_board.execute_moves(more_moves)
+
+        if plausible_moves:
+            moves = plausible_moves
+            break
 
     return moves
 
@@ -1439,16 +1451,12 @@ def cards_to_sequences(cards: list[Card]) -> list[list[Card]]:
     return sequences
 
 
-def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int|None:
-    highest_rank = -1
-    selected_stack_id = None
-    available_dof = degrees_of_freedom_for_empty_stacks(board.count_empty_stacks())
-    for id, stack in enumerate(board.stacks):
-        if id in ignored_stacks or stack.is_empty() or not stack.is_stacked_on_table():
-            continue
+def _select_stacks_to_free(board: Board) -> list[int]:
+    stacks_to_free = []
+    available_dof = dof_board(board)
 
-        rank = stack.cards[0].rank
-        if rank <= highest_rank or rank == 14:
+    for id, stack in enumerate(board.stacks):
+        if stack.is_empty() or not stack.is_stacked_on_table() or stack.cards[0].rank == 14:
             continue
 
         cards_to_move = stack.cards
@@ -1458,7 +1466,7 @@ def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int|None:
         stacks_to_consider = [
             cid
             for cid, other_stack in enumerate(board.stacks)
-            if cid != id and not cid in ignored_stacks and not other_stack.is_empty()
+            if cid != id and not other_stack.is_empty()
         ]
         for dest in stacks_to_consider:
             if not board.stacks[dest].can_stack(cards_to_move[0]):
@@ -1466,13 +1474,15 @@ def _select_stack_to_free(board: Board, ignored_stacks: list[int]) -> int|None:
 
             dof_needed, _ = dof_to_move_stacked_reversibly(
                 cards_to_sequences(cards_to_move),
-                get_top_cards_board(board, [id]),
+                get_top_cards_board(board),
             )
 
             if dof_needed <= available_dof:
-                highest_rank = rank
-                selected_stack_id = id
-    return selected_stack_id
+                stacks_to_free.append((id, stack.cards[0].rank))
+
+    # Sort the list of stacks by rank in descending order (highest rank first)
+    stacks_to_free.sort(key=lambda x: x[1], reverse=True)
+    return [stack_id for stack_id, _ in stacks_to_free]
 
 
 def find_placement_index_for_card(
