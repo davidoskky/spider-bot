@@ -463,8 +463,8 @@ class Board:
             return None
         return self.get_stack(stack_id).cards[card_id]
 
-    def card_exists(self, stack_id, card_id) -> bool:
-        return card_id >= len(self.get_stack(stack_id).cards)
+    def card_exists(self, stack_id: int, card_id: int) -> bool:
+        return card_id < len(self.get_stack(stack_id).cards)
 
     def _count_breaking_cards(self, condition):
         count = 0
