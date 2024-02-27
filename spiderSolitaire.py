@@ -50,6 +50,13 @@ class Stack:
     def is_valid_stacked_sequence(self, start_index: int) -> bool:
         return self._is_valid_sequence(start_index, lambda c, n: c.can_stack(n))
 
+    def card_position(self, card: Card) -> int | None:
+        try:
+            position = self.cards.index(card)
+            return position
+        except ValueError:
+            return None
+
     def _is_valid_sequence(self, start_index: int, condition) -> bool:
         if not self.is_visible(start_index):
             return False
@@ -466,6 +473,13 @@ class Board:
 
     def card_exists(self, stack_id: int, card_id: int) -> bool:
         return card_id < len(self.get_stack(stack_id).cards)
+
+    def card_position(self, card: Card) -> tuple[int, int]:
+        for stack_id, stack in enumerate(self.stacks):
+            card_id = stack.card_position(card)
+            if card_id is not None:
+                return (stack_id, card_id)
+        raise ValueError("Card not on the table")
 
     def _count_breaking_cards(self, condition):
         count = 0
