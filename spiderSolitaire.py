@@ -706,6 +706,10 @@ class SpiderSolitaire:
             if self.is_game_lost():
                 print("No more moves available. Game lost.")
 
+    def execute_moves(self, moves: list[Move]):
+        self.board.execute_moves(moves)
+        self.move_count += len(moves)
+
     def move_by_index(self, from_stack_index, to_stack_index, card_index):
         self.board.move_by_index(from_stack_index, to_stack_index, card_index)
         self.move_count += 1
