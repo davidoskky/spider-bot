@@ -992,7 +992,8 @@ def _move_stacked_to_temporary_position(
     clearing_moves = []
     cloned_board = board.clone()
     stack = cloned_board.get_stack(stack_id)
-    if not board.card_exists(stack_id, card_index):
+    card = cloned_board.get_card(stack_id, card_index)
+    if card is None:
         logging.debug(f"_move_stacked_to_temporary_position: card index out of bounds")
         return []
 
@@ -1003,15 +1004,16 @@ def _move_stacked_to_temporary_position(
         temporary_stack_ids = find_stacks_to_move_card(
             cloned_board, stack.cards[card_index], ignored_stacks=ignored_stacks, ignore_empty=False)
 
-        # TODO: Error if the free_stack function moves away cards from the one we are moving from
         if not temporary_stack_ids:
             clearing_moves = free_stack(cloned_board, ignored_stacks=ignored_stacks)
             if not clearing_moves:
                 return []
 
             cloned_board.execute_moves(clearing_moves)
+            if not cloned_board.card_exists(stack_id, card_index):
+                stack_id, card_index = cloned_board.card_position(card)
             temporary_stack_ids = find_stacks_to_move_card(
-                cloned_board, stack.cards[card_index], ignored_stacks=ignored_stacks, ignore_empty=False)
+                cloned_board, card, ignored_stacks=ignored_stacks, ignore_empty=False)
 
     logging.debug(f"_move_stacked_to_temporary_position: plausible stacks = {temporary_stack_ids}")
 
