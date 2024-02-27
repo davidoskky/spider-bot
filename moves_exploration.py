@@ -632,7 +632,7 @@ def move_cards_removing_interfering(
     if moves_to_complete_switch:
         moves.extend(clearance_moves)
         moves.extend(moves_to_complete_switch)
-    else:
+    elif board.card_exists(source_stack_id, source_card_id + 1):
         cloned_board = board.clone()
         clearance_moves = _move_stacked_to_temporary_position(
             cloned_board, source_stack_id, source_card_id + 1, ignored_stacks=[target_stack_id]
@@ -992,7 +992,7 @@ def _move_stacked_to_temporary_position(
     clearing_moves = []
     cloned_board = board.clone()
     stack = cloned_board.get_stack(stack_id)
-    if card_index >= len(stack.cards):
+    if not board.card_exists(stack_id, card_index):
         logging.debug(f"_move_stacked_to_temporary_position: card index out of bounds")
         return []
 
@@ -1068,7 +1068,7 @@ def free_stack(board: Board, ignored_stacks: list[int] = [], stacks_not_to_move_
         plausible_moves.extend(temp_moves)
 
         while cloned_board.count_empty_stacks() <= initial_empty_stacks:
-            more_moves = free_stack(cloned_board, ignored_stacks)
+            more_moves = free_stack(cloned_board, ignored_stacks, stacks_not_to_move_to)
             if not more_moves:
                 plausible_moves = []
                 cloned_board = board.clone()
@@ -1290,7 +1290,7 @@ def move_card_to_top(board: Board, source_id, target_id, card_id) -> list[Move]:
         logging.debug(f"{func_name}: No reversible moves found, attempting to free up space")
         # If no reversible moves are found, attempt to free up space
         clearing_moves = free_stack(
-            cloned_board, ignored_stacks=[source_id]
+            cloned_board, ignored_stacks=[source_id], stacks_not_to_move_to=[target_id]
         )
         if not clearing_moves:
             logging.debug(f"{func_name}: No moves to free up space, exiting")
