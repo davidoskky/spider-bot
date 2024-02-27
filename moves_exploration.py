@@ -1094,18 +1094,17 @@ def stacks_which_can_be_freed(board: Board) -> int:
     return final_free_stacks - initial_free_stacks
 
 
-def _reversible_move_away_from_stack(
-    board: Board,
-    stack_to_free_id: int,
-    card_id,
-    ignored_stacks: list[int],
-) -> list[Move]:
+def _reversible_move_away_from_stack( board: Board, stack_to_free_id: int, card_id, ignored_stacks: list[int] = []) -> list[Move]:
     """
     Attempts to find and execute a reversible move to transfer a sequence of cards from a specific stack to another,
     aiming to free up the stack while considering the current degrees of freedom (DoF) on the board. The function
     can optionally split the sequence if it leads to a reversible move and respects the game's constraints.
     """
+    # TODO: This should favor moving towards other cards rather than empty stacks when possible
     logging.debug(f"_reversible_move_away_from_stack: Attempting reversible move from stack {stack_to_free_id} starting from card {card_id}")
+    if not board.card_exists(stack_to_free_id, card_id):
+        return []
+
     direct_moves = _move_away_direct(board, stack_to_free_id, card_id, ignored_stacks)
     if direct_moves:
         return direct_moves
@@ -1247,36 +1246,47 @@ def move_card_to_top(board: Board, source_id, target_id, card_id) -> list[Move]:
             logging.debug(f"{func_name}: Card moved directly with moves: {direct_moves}")
             break
 
-        if card_id >= len(source_stack.cards) - 1:
+        if not board.card_exists(source_id, card_id):
             logging.debug(f"{func_name}: No more cards to move, exiting loop")
             moves = []
             break
 
-        # Attempt reversible moves with and without considering splits
-        reversible_moves = _reversible_move_away_from_stack(
-            cloned_board,
-            source_id,
-            card_id+1,
-            [source_id],
-        )
+        cards_to_move = source_stack.cards[card_id:]
+        sequences_to_move = cards_to_sequences(cards_to_move)
 
-        if reversible_moves:
-            logging.debug(f"{func_name}: Reversible moves found: {reversible_moves}")
-            moves.extend(reversible_moves)
-            cloned_board.execute_moves(reversible_moves)
-        else:
-           logging.debug(f"{func_name}: No reversible moves found, attempting to free up space")
-           # If no reversible moves are found, attempt to free up space
-           freeing_moves = free_stack(
-               cloned_board, ignored_stacks=[source_id, target_id]
-           )
-           if not freeing_moves:
-               logging.debug(f"{func_name}: No moves to free up space, exiting")
-               moves = []
-               break
-           logging.debug(f"{func_name}: Freeing moves found: {freeing_moves}")
-           moves.extend(freeing_moves)
-           cloned_board.execute_moves(freeing_moves)
+        multiple_sequences_to_move = len(sequences_to_move) > 1
+
+
+        # If there are multiple sequences in the stacked sequence, attmpt to
+        # move the ones above the sequence to move
+        if multiple_sequences_to_move:
+            # Attempt reversible moves with and without considering splits
+            first_card_in_following_sequence = card_id + len(sequences_to_move[0])
+            reversible_moves = _reversible_move_away_from_stack(
+                cloned_board,
+                source_id,
+                first_card_in_following_sequence,
+                [source_id],
+            )
+
+            if reversible_moves:
+                logging.debug(f"{func_name}: Reversible moves found: {reversible_moves}")
+                moves.extend(reversible_moves)
+                cloned_board.execute_moves(reversible_moves)
+                continue
+
+        logging.debug(f"{func_name}: No reversible moves found, attempting to free up space")
+        # If no reversible moves are found, attempt to free up space
+        clearing_moves = free_stack(
+            cloned_board, ignored_stacks=[source_id]
+        )
+        if not clearing_moves:
+            logging.debug(f"{func_name}: No moves to free up space, exiting")
+            moves = []
+            break
+        logging.debug(f"{func_name}: Freeing moves found: {clearing_moves}")
+        moves.extend(clearing_moves)
+        cloned_board.execute_moves(clearing_moves)
 
     logging.debug(f"{func_name}: Total moves made: {moves}")
     return moves
