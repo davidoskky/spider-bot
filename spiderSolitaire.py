@@ -1,5 +1,6 @@
 import copy
 from operator import is_
+from random import randint, random
 from typing import Optional
 
 from deck import Card, Deck, SimpleDeck
