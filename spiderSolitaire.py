@@ -458,8 +458,13 @@ class Board:
         else:
             raise ValueError("Invalid stack id")
 
-    def get_card(self, stack_id: int, card_id: int) -> Card:
+    def get_card(self, stack_id: int, card_id: int) -> Card | None:
+        if not self.card_exists(stack_id, card_id):
+            return None
         return self.get_stack(stack_id).cards[card_id]
+
+    def card_exists(self, stack_id, card_id) -> bool:
+        return card_id >= len(self.get_stack(stack_id).cards)
 
     def _count_breaking_cards(self, condition):
         count = 0
