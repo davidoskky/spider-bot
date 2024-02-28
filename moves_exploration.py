@@ -224,7 +224,7 @@ def find_progressive_actions_manual(board: Board) -> list[list[Move]]:
         # Ignore stacks resting on the board, nothing to be discovered there
         if first_stacked_card_id == 0:
             continue
-        print(f"find_progressive_actions_manual: source: {source_stack_index}, card {first_stacked_card_id}")
+        # print(f"find_progressive_actions_manual: source: {source_stack_index}, card {first_stacked_card_id}")
 
         card_to_move = board.get_card(source_stack_index, first_stacked_card_id)
 
@@ -245,7 +245,7 @@ def find_progressive_actions_manual(board: Board) -> list[list[Move]]:
             if moves:
                 paths.append(moves)
 
-    print(paths)
+    # print(paths)
     return paths
 
 
@@ -507,42 +507,6 @@ def is_stacked_improved(
     return len(source_sequence) > len(leaving_target)
 
 
-# TODO: This is not correct it should be sequence length can be increased and consider
-# like 9 - 8 - 7 - 6 and 6 - 5 - 4 - 3 - 2 - 1 can still be merged even though 6 cannot sequence 6
-def _identify_plausible_improved_equivalent_positions(board: Board) -> bool:
-    """
-    Determine if there are any plausible moves on the board that could lead to an improved position.
-
-    This function analyzes each stack on the board, identifying the initial and final ranks
-    of the sequences within each stack. It then checks if a card from one sequence (based on its rank)
-    can be moved to the end of another sequence. This is a potential move that could lead to an
-    improved board position.
-
-    :param board: The current state of the Spider Solitaire game board.
-    :return: True if there is at least one plausible move that could improve the board position, False otherwise.
-    """
-    potential_movable_cards = set()
-    potential_destination_cards = set()
-
-    for stack in board.stacks:
-        sequences = stack.get_accessible_sequences()
-
-        if sequences:
-            if stack.first_accessible_sequence == 0:
-                potential_movable_cards.add(sequences[0][0])
-
-            for i, sequence in enumerate(sequences):
-                if i != 0:
-                    potential_movable_cards.add(sequence[0])
-                potential_destination_cards.add(sequence[-1])
-
-    return any(
-        destination.can_sequence(movable)
-        for destination in potential_destination_cards
-        for movable in potential_destination_cards
-    )
-
-
 def search_for_beneficial_reversible_move(board: Board) -> bool:
     """
     Determine if there's a reversible move on the board that could lead to an improved position.
@@ -605,6 +569,7 @@ def move_cards_removing_interfering(
     - list[Move]: A list of Move objects representing the required actions to relocate the card, including any temporary
       moves to clear interfering cards.
     """
+    # TODO: This should use sequences
     moves: list[Move] = []
     cloned_board = board.clone()
 
