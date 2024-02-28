@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, Optional
 
 from deck import Card
 
@@ -1599,21 +1599,31 @@ def find_stacks_to_move_card(
 
 def find_stack_to_move_sequence(
     board: Board, top_card: Card, ignored_stacks: list[int] = [], ignore_empty=False
-):
+) -> Optional[int]:
     """
     Find a stack to which the sequence can be legally moved.
+    If ignore_empty is false, empty stacks will be considered, but if a valid non empty stacks is
+    available it will be returned.
 
     :param board: The current board state.
     :param sequence: The sequence of cards to move.
     :return: ID of the stack where the sequence can be moved, or None if not found.
     """
+    suitable_empty_stack = None
+
     for target_stack_id, target_stack in enumerate(board.stacks):
         if target_stack_id in ignored_stacks:
             continue
-        if ignore_empty and target_stack.is_empty():
-            continue
-        if target_stack.can_stack(top_card):
+
+        if not target_stack.is_empty() and target_stack.can_stack(top_card):
             return target_stack_id
+
+        if suitable_empty_stack is None and target_stack.is_empty():
+            suitable_empty_stack = target_stack_id
+
+    if not ignore_empty and suitable_empty_stack is not None:
+        return suitable_empty_stack
+
     return None
 
 
