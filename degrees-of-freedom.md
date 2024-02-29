@@ -36,6 +36,9 @@ In such case two different algorithms are plausible.
     - Remove the destination stack from the stacks we are considering for stacking further cards.
     - Repeat the steps until we moved the card we wished to move.
 
+Idea:
+Probably, it is best to move full sequences on top of other cards if that is possible. Only splitting sequences if that is strictly necessary to permit the movevent.
+
 Problems:
 
 - These algorithms do not consider freeing further stacks if doing so is required or advantageous.
