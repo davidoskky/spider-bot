@@ -1122,20 +1122,45 @@ def _reversible_move_away_from_stack(
 
 
 def _move_away_splitting(
-    board: Board, stack_id: int, card_id: int, ignored_stacks: list[int] = []
+    board: Board,
+    stack_id: int,
+    card_id: int,
+    ignored_stacks: Optional[list[int]] = None,
 ) -> list[Move]:
+    """
+    Attempts to move cards away from a specified stack starting from a given card index,
+    either as sequences or individually. Using temporary positions on other stacks.
+
+    The function first tries to move sequences of cards starting from the specified card index.
+    If moving sequences is not possible, it attempts to move individual cards.
+    Moves are attempted only to stacks not listed in `excluded_stacks`.
+    """
     logging.debug(
-        f"_move_away_splitting: Attempting to split and move away cards from stack {stack_id} starting from card {card_id}"
+        f"Splitting and attempting to move cards away from stack {stack_id}, starting from card {card_id}. Ignoring stacks: {ignored_stacks}"
     )
-    ignored_stacks.append(stack_id)
+    if ignored_stacks is None:
+        ignored_stacks = []
+
+    cards_to_move = board.get_stack(stack_id).cards[card_id:]
+    sequences = cards_to_sequences(cards_to_move)
+    moves = []
+
+    # At first, attempt moving away by sequence, otherwise move away splitting sequences
+    # Exclude the last card's sequence as it cannot be moved
+    for sequence in sequences[:-1]:
+        sequence_length = len(sequence)
+        moves = _move_away_direct(
+            board, stack_id, card_id + sequence_length, ignored_stacks
+        )
+        if moves:
+            return moves
 
     for considered_card_id in range(card_id, len(board.get_stack(stack_id).cards)):
-        can_move = _move_away_direct(
-            board, stack_id, considered_card_id, ignored_stacks
-        )
-        if can_move:
-            return can_move
-    return []
+        moves = _move_away_direct(board, stack_id, considered_card_id, ignored_stacks)
+        if moves:
+            return moves
+
+    return moves
 
 
 def _move_away_direct(
@@ -1144,8 +1169,12 @@ def _move_away_direct(
     logging.debug(
         f"_move_away_direct: Attempting direct move for card {card_id} in stack {stack_id}"
     )
+    card = board.get_card(stack_id, card_id)
+    if card is None:
+        return []
+
     target_stack_id = find_stack_to_move_sequence(
-        board, board.get_card(stack_id, card_id), ignored_stacks, ignore_empty=False
+        board, card, ignored_stacks, ignore_empty=False
     )
     if target_stack_id is not None:
         return _move_card_to_no_splits(board, stack_id, target_stack_id, card_id)
