@@ -9,6 +9,35 @@ The number of degrees of freedom of the board can be rapidly calculated with the
 Since the board can be rearranged in several different ways through reversible moves, and each of those states can be translated to any other state through reversible moves, it is also useful to define the maximum attainable amount of degrees of freedom of a reversible state.
 This is done by identifying the maximum amount of empty stacks which can be attained through reversible moves and calculating the amount of degrees of freedom with the previous formula.
 
+The following is the algorithm which can be used to move k stacked sequences of different suite from one single stack to n empty stacks.
+Condition: this algorithm is applicable only when $k \leq 2^n -1$.
+Given n empty stacks, when filling each of them through this algorithm it will result in $2^{n-1}$ stacks in the first empty stack, $2^{n-2}$ stacks in the second empty stack and so forth.
+
+Algorithm 1: Destacker
+
+INITIALIZE
+- Let `S` be the original stack of cards.
+- Let `E = {E1, E2, ..., En}` represent the `k` empty stacks.
+- Set `movedStacks` to 0.
+- Set `availableStacks` to `n-1`.
+- Set `sequencesToMove` array(int)[2^0..2^(n-1)] reversed
+
+1. If `S` is empty, return - stop condition
+1. pop `m` from `sequencesToMove`
+2. **Move Sequence**: Move the `m` topmost sequence in `S` to the first available stacks in `E`.
+3. Increase `movedStacks` by `m`.
+4. **Update Status**: If the entire stack `S` has been moved, terminate the algorithm.
+5. If `movedStacks` < 2^(`availableStacks`):
+6. while there are single stacks on the empty stacks:
+  1. move the highest stack which can be moved on top of another card
+7. else if `movedStacks` == 2^(`availableStacks`):
+8. While there is more than 1 occupied empty stack:
+  1. If any single stack can be stacked on the topmost card, do that
+  2. Unravel the second topmost stack
+9. Call this function recursively with the modified `S`, `E-1` and `n-1`
+
+---
+
 The first simplification which can be obtained by using this identifier is sequences of moves coming from one single stack which are always impossible.
 If we are trying to move a stack composed of 3 sequences of cards of the same rank and none of the cards in those sequences can be placed onto an other card in the board, we need at least 3 degrees of freedom in the current state. This translates into having 2 empty stacks on the board.
 If we have less than 2 empty stacks, it is certain that moving the cards is impossible through a sequence of reversible moves.
