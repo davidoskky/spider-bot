@@ -333,14 +333,14 @@ def test_should_not_move_equivalent_start_of_stack():
 def test_error_14_02():
     board = generate_board_from_string(
         """Stack 0:
-    Stack 1: XX XX 1♠ 3♣ 2♣ 1♣ 9♦ 8♦ 11♠ 10♣ 9♣ 8♣ 7♣ 6♣
-    Stack 2: XX XX XX XX XX 13♠ 12♠ 11♣ 10♠ 9♦ 8♦ 7♦ 6♦ 3♣ 2♣ 1♣ 4♣ 3♦ 2♦ 1♦
+    Stack 1: XX XX 8♦ 11♠ 10♣ 9♣ 8♣ 7♣ 6♣
+    Stack 2: XX XX XX XX XX 1♣ 4♣ 3♦ 2♦ 1♦
     Stack 3: XX 5♦ 4♣ 3♣ 2♣ 1♦
-    Stack 4: XX XX 5♣ 8♠ 7♥ 6♣ 5♣ 4♣ 13♦ 12♦ 11♠ 10♠ 9♠ 8♠ 7♠ 6♥ 5♥ 4♣ 3♥ 2♣
+    Stack 4: XX XX 13♦ 12♦ 11♠ 10♠ 9♠ 8♠ 7♠ 6♥ 5♥ 4♣ 3♥ 2♣
     Stack 5:
     Stack 6:
     Stack 7: 12♣ 11♦ 10♣ 9♣ 8♣ 7♠ 6♣
-    Stack 8: 13♠ 12♠ 11♠ 10♠ 9♠ 3♦ 11♦ 10♦ 9♥
+    Stack 8: 3♦ 11♦ 10♦ 9♥
     Stack 9: 6♦
     """
     )
