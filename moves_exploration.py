@@ -1235,28 +1235,32 @@ def _move_card_to_no_splits(
         stack_to_stack_moves = _optimal_stacked_reversible_movement(
             cloned_board, source_id, len(sequences) - 1
         )
-        if stack_to_stack_moves is not None:
-            for move_set in stack_to_stack_moves:
-                start, dest = move_set
-                card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
-                if start == source_id and card_id < card_to_move:
-                    card_id = card_to_move
-                move = Move(start, dest, card_id)
-                cloned_board.move_by_index(*move)
-                moves.append(move)
+        if not stack_to_stack_moves:
+            return []
+
+        for move_set in stack_to_stack_moves:
+            start, dest = move_set
+            card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+            if start == source_id and card_id < card_to_move:
+                card_id = card_to_move
+            move = Move(start, dest, card_id)
+            cloned_board.move_by_index(*move)
+            moves.append(move)
     if len(sequences) > 1 and target_is_empty:
         stack_to_stack_moves = _optimal_stacked_reversible_movement(
             cloned_board, source_id, len(sequences), final_stack=target_id
         )
-        if stack_to_stack_moves is not None:
-            for move_set in stack_to_stack_moves:
-                start, dest = move_set
-                card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
-                if start == source_id and card_id < card_to_move:
-                    card_id = card_to_move
-                move = Move(start, dest, card_id)
-                cloned_board.move_by_index(*move)
-                moves.append(move)
+        if not stack_to_stack_moves:
+            return []
+
+        for move_set in stack_to_stack_moves:
+            start, dest = move_set
+            card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+            if start == source_id and card_id < card_to_move:
+                card_id = card_to_move
+            move = Move(start, dest, card_id)
+            cloned_board.move_by_index(*move)
+            moves.append(move)
 
     if len(sequences) == 1 and target_is_empty:
         move = Move(source_id, target_id, card_to_move)
@@ -1271,6 +1275,7 @@ def _move_card_to_no_splits(
 
 def move_card_to_top(board: Board, source_id, target_id, card_id) -> list[Move]:
     """Produces a series of moves which lead to moving one specific card to the top of another stack through reversible moves"""
+    # TODO: This function does not work as expected. It should integrate an algorithm which allows it to move the downward stacks if those are blocking.
     func_name = "move_card_to_top"
     moves: list[Move] = []
     cloned_board = board.clone()
@@ -1360,7 +1365,7 @@ def _optimal_stacked_reversible_movement(
     source_stack_id: int,
     amount_of_sequences: int,
     final_stack: int | None = None,
-):
+) -> list[tuple[int, int]]:
     """
     Generates an optimal sequence of moves to free one stack given a number of empty stacks,
     ensuring that the number of moves starting from the source stack matches the amount of sequences.
@@ -1374,21 +1379,28 @@ def _optimal_stacked_reversible_movement(
     """
     empty_stacks = [id for id, stack in enumerate(board.stacks) if stack.is_empty()]
     if not empty_stacks:
-        return None
+        return []
 
     if amount_of_sequences > 2 ^ (len(empty_stacks)) - 1:
-        return None
-    # moves = _optimal_stacked_reversible_movement_sets(
-    #    board, source_stack_id, amount_of_sequences
-    # )
-    moves, _ = destacker(amount_of_sequences, empty_stacks, source_stack_id)
-    logging.debug(f"_optimal_stacked_reversible_movement: moves = {moves}")
+        return []
+
+    if amount_of_sequences < 1:
+        return []
+
+    stack_to_stack_moves, _ = destacker(
+        amount_of_sequences, empty_stacks, source_stack_id
+    )
+    logging.debug(
+        f"_optimal_stacked_reversible_movement: stack moves = {stack_to_stack_moves}"
+    )
     if final_stack is not None:
-        moves = _translate_optimal_moves(moves, final_stack)
-        logging.debug(
-            f"_optimal_stacked_reversible_movement: moves after translation = {moves}"
+        stack_to_stack_moves = _translate_optimal_moves(
+            stack_to_stack_moves, final_stack
         )
-    return moves
+        logging.debug(
+            f"_optimal_stacked_reversible_movement: stack moves after translation = {stack_to_stack_moves}"
+        )
+    return stack_to_stack_moves
 
 
 def _optimal_stacked_reversible_movement_sets(
