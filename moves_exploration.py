@@ -1235,26 +1235,28 @@ def _move_card_to_no_splits(
         stack_to_stack_moves = _optimal_stacked_reversible_movement(
             cloned_board, source_id, len(sequences) - 1
         )
-        for move_set in stack_to_stack_moves:
-            start, dest = move_set
-            card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
-            if start == source_id and card_id < card_to_move:
-                card_id = card_to_move
-            move = Move(start, dest, card_id)
-            cloned_board.move_by_index(*move)
-            moves.append(move)
+        if stack_to_stack_moves is not None:
+            for move_set in stack_to_stack_moves:
+                start, dest = move_set
+                card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+                if start == source_id and card_id < card_to_move:
+                    card_id = card_to_move
+                move = Move(start, dest, card_id)
+                cloned_board.move_by_index(*move)
+                moves.append(move)
     if len(sequences) > 1 and target_is_empty:
         stack_to_stack_moves = _optimal_stacked_reversible_movement(
             cloned_board, source_id, len(sequences), final_stack=target_id
         )
-        for move_set in stack_to_stack_moves:
-            start, dest = move_set
-            card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
-            if start == source_id and card_id < card_to_move:
-                card_id = card_to_move
-            move = Move(start, dest, card_id)
-            cloned_board.move_by_index(*move)
-            moves.append(move)
+        if stack_to_stack_moves is not None:
+            for move_set in stack_to_stack_moves:
+                start, dest = move_set
+                card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+                if start == source_id and card_id < card_to_move:
+                    card_id = card_to_move
+                move = Move(start, dest, card_id)
+                cloned_board.move_by_index(*move)
+                moves.append(move)
 
     if len(sequences) == 1 and target_is_empty:
         move = Move(source_id, target_id, card_to_move)
@@ -1370,9 +1372,16 @@ def _optimal_stacked_reversible_movement(
     :param final_stack: Ensure that the last move ends on this stack or it is not used in any move
     :return: List of tuples representing the moves, where each tuple is (source_stack_id, target_stack_id).
     """
-    moves = _optimal_stacked_reversible_movement_sets(
-        board, source_stack_id, amount_of_sequences
-    )
+    empty_stacks = [id for id, stack in enumerate(board.stacks) if stack.is_empty()]
+    if not empty_stacks:
+        return None
+
+    if amount_of_sequences > 2 ^ (len(empty_stacks)) - 1:
+        return None
+    # moves = _optimal_stacked_reversible_movement_sets(
+    #    board, source_stack_id, amount_of_sequences
+    # )
+    moves, _ = destacker(amount_of_sequences, empty_stacks, source_stack_id)
     logging.debug(f"_optimal_stacked_reversible_movement: moves = {moves}")
     if final_stack is not None:
         moves = _translate_optimal_moves(moves, final_stack)
@@ -1443,6 +1452,85 @@ def _optimal_stacked_reversible_movement_sets(
         moves.append((source_stack_id, empty_stacks[1]))
 
     return moves
+
+
+def destacker(sequences: int, empty_stacks: list[int], source_id: int):
+    """Algorithm 1: Move k sequences into n empty stacks
+
+    Algorithm described somewhere in the reference documentation.
+    """
+
+    if sequences == 0:
+        return [], []
+
+    if not empty_stacks:
+        raise ValueError("No empty stacks provided")
+
+    used_E = []
+    moves = []
+    while empty_stacks:
+        # Using the maximum ensures always having at least 1, which covers the case in which only one stack is empty, in which one card has to be moved
+        to_move = max(2 ^ (len(empty_stacks) - 2), 1)
+        to_free = []
+
+        for _ in range(to_move):
+            moving = empty_stacks.pop()
+            used_E.append(moving)
+            to_free.append(moving)
+            moves.append((source_id, moving))
+            sequences -= 1
+            if sequences == 0:
+                return moves, used_E
+
+            logging.debug(f"moves: {moves}")
+
+        destination = to_free.pop()
+        logging.debug(f"to free {to_free}")
+        for origin in reversed(to_free):
+            moves.append((origin, destination))
+            empty_stacks.append(origin)
+            used_E.remove(origin)
+
+    # At this point, all stacks are occupied and we have 2^(n-1) sequences on the stacks being considered
+    # Now we perform the moves to move all those sequences to one single stack.
+    logging.debug(f"Moves when destacking complete: {moves}")
+    cycle = 1
+    step = 1
+
+    # Once the last stack has been occupied, stop considering it among the movable ones
+    last_stack = used_E.pop()
+    to_free = [used_E[-1]]
+    while len(used_E) > 0:
+        # At a maximum, two stacks can be stacked per destack cycle when all DoF are being used. First and last move only move two stacks.
+
+        for origin in to_free:
+            moves.append((origin, last_stack))
+            empty_stacks.append(origin)
+            used_E.remove(origin)
+
+        logging.debug(f"moves after stacker {moves}, occupied_stacks: {used_E}")
+
+        if len(used_E) == 0:
+            break
+
+        if not empty_stacks:
+            continue
+
+        to_free.append(used_E[-1])
+        t_moves, t_used = destacker(2 ^ (step) - 1, empty_stacks, last_stack)
+        moves.extend(t_moves)
+        used_E.extend(t_used)
+        to_free.append(t_used[-1])
+
+        step -= 1
+        if step == 0:
+            cycle += 1
+            step = cycle
+
+    t_moves, _ = destacker(sequences, empty_stacks, source_id)
+    moves.extend(t_moves)
+    logging.debug(f"moves 2: {moves}")
+    return moves, used_E
 
 
 def _translate_optimal_moves(
