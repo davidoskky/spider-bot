@@ -1403,69 +1403,6 @@ def _optimal_stacked_reversible_movement(
     return stack_to_stack_moves
 
 
-def _optimal_stacked_reversible_movement_sets(
-    board: Board,
-    source_stack_id: int,
-    amount_of_sequences: int,
-):
-    """
-    Generates an optimal sequence of moves to free one stack given a number of empty stacks,
-    ensuring that the number of moves starting from the source stack matches the amount of sequences.
-    It does not consider moving cads on top of others, it only uses the empty stacks.
-
-    :param board: The current state of the Spider Solitaire game.
-    :param source_stack_id: ID of the source stack from which cards are to be moved.
-    :param amount_of_sequences: Number of sequences in the source stack to be moved.
-    :param final_stack: Ensure that the last move ends on this stack or it is not used in any move
-    :return: List of tuples representing the moves, where each tuple is (source_stack_id, target_stack_id).
-    """
-    initial_empty_stacks = board.count_empty_stacks()
-    empty_stacks = [id for id, stack in enumerate(board.stacks) if stack.is_empty()]
-    moves: list[tuple[int, int]] = []
-
-    if initial_empty_stacks == 0:
-        return moves
-    if initial_empty_stacks == 1:
-        moves.append((source_stack_id, empty_stacks[0]))
-    if initial_empty_stacks == 2:
-        moves.append((source_stack_id, empty_stacks[0]))
-        if amount_of_sequences == 1:
-            return moves
-        moves.append((source_stack_id, empty_stacks[1]))
-        if amount_of_sequences == 2:
-            return moves
-        moves.append((empty_stacks[0], empty_stacks[1]))
-        moves.append((source_stack_id, empty_stacks[0]))
-    if initial_empty_stacks >= 3:
-        moves.append((source_stack_id, empty_stacks[0]))
-        if amount_of_sequences == 1:
-            return moves
-        moves.append((source_stack_id, empty_stacks[1]))
-        if amount_of_sequences == 2:
-            return moves
-        moves.append((source_stack_id, empty_stacks[2]))
-        if amount_of_sequences == 3:
-            return moves
-        moves.append((empty_stacks[0], empty_stacks[1]))
-        moves.append((source_stack_id, empty_stacks[0]))
-        if amount_of_sequences == 4:
-            return moves
-        moves.append((empty_stacks[2], empty_stacks[0]))
-        moves.append((empty_stacks[1], empty_stacks[2]))
-        moves.append((empty_stacks[1], empty_stacks[0]))
-        moves.append((source_stack_id, empty_stacks[1]))
-        if amount_of_sequences == 5:
-            return moves
-        moves.append((empty_stacks[2], empty_stacks[0]))
-        moves.append((source_stack_id, empty_stacks[2]))
-        if amount_of_sequences == 6:
-            return moves
-        moves.append((empty_stacks[1], empty_stacks[2]))
-        moves.append((source_stack_id, empty_stacks[1]))
-
-    return moves
-
-
 def destacker(sequences: int, empty_stacks: list[int], source_id: int):
     """Algorithm 1: Move k sequences into n empty stacks
 
@@ -1478,30 +1415,34 @@ def destacker(sequences: int, empty_stacks: list[int], source_id: int):
     if not empty_stacks:
         raise ValueError("No empty stacks provided")
 
-    used_E = []
+    used_stacks = []
     moves = []
     while empty_stacks:
         # Using the maximum ensures always having at least 1, which covers the case in which only one stack is empty, in which one card has to be moved
         to_move = max(2 ^ (len(empty_stacks) - 2), 1)
-        to_free = []
+        stacks_to_free = []
 
         for _ in range(to_move):
-            moving = empty_stacks.pop()
-            used_E.append(moving)
-            to_free.append(moving)
-            moves.append((source_id, moving))
-            sequences -= 1
             if sequences == 0:
-                return moves, used_E
+                break
+            target_stack = empty_stacks.pop()
+            used_stacks.append(target_stack)
+            stacks_to_free.append(target_stack)
+            moves.append((source_id, target_stack))
+            sequences -= 1
 
             logging.debug(f"moves: {moves}")
 
-        destination = to_free.pop()
-        logging.debug(f"to free {to_free}")
-        for origin in reversed(to_free):
-            moves.append((origin, destination))
+        if sequences == 0:
+            return moves, used_stacks
+
+        # Free up stacks for the next iteration by moving all sequence to a single stack
+        destination_stack = stacks_to_free.pop()
+        logging.debug(f"to free {stacks_to_free}")
+        for origin in reversed(stacks_to_free):
+            moves.append((origin, destination_stack))
             empty_stacks.append(origin)
-            used_E.remove(origin)
+            used_stacks.remove(origin)
 
     # At this point, all stacks are occupied and we have 2^(n-1) sequences on the stacks being considered
     # Now we perform the moves to move all those sequences to one single stack.
@@ -1510,29 +1451,29 @@ def destacker(sequences: int, empty_stacks: list[int], source_id: int):
     step = 1
 
     # Once the last stack has been occupied, stop considering it among the movable ones
-    last_stack = used_E.pop()
-    to_free = [used_E[-1]]
-    while len(used_E) > 0:
+    last_stack = used_stacks.pop()
+    stacks_to_free = [used_stacks[-1]]
+    while used_stacks:
         # At a maximum, two stacks can be stacked per destack cycle when all DoF are being used. First and last move only move two stacks.
 
-        for origin in to_free:
+        for origin in stacks_to_free:
             moves.append((origin, last_stack))
             empty_stacks.append(origin)
-            used_E.remove(origin)
+            used_stacks.remove(origin)
 
-        logging.debug(f"moves after stacker {moves}, occupied_stacks: {used_E}")
+        logging.debug(f"moves after stacker {moves}, occupied_stacks: {used_stacks}")
 
-        if len(used_E) == 0:
+        if not used_stacks:
             break
 
         if not empty_stacks:
             continue
 
-        to_free.append(used_E[-1])
+        stacks_to_free.append(used_stacks[-1])
         t_moves, t_used = destacker(2 ^ (step) - 1, empty_stacks, last_stack)
         moves.extend(t_moves)
-        used_E.extend(t_used)
-        to_free.append(t_used[-1])
+        used_stacks.extend(t_used)
+        stacks_to_free.append(t_used[-1])
 
         step -= 1
         if step == 0:
@@ -1542,7 +1483,7 @@ def destacker(sequences: int, empty_stacks: list[int], source_id: int):
     t_moves, _ = destacker(sequences, empty_stacks, source_id)
     moves.extend(t_moves)
     logging.debug(f"moves 2: {moves}")
-    return moves, used_E
+    return moves, used_stacks
 
 
 def _translate_optimal_moves(
