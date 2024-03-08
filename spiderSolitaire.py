@@ -3,6 +3,7 @@ from operator import is_
 from random import randint, random
 from typing import Optional
 
+from cardSequence import CardSequence, cards_to_sequences
 from deck import Card, Deck, SimpleDeck
 from moves_exploration import Move, find_progressive_actions
 
@@ -138,11 +139,17 @@ class Stack:
         else:
             return None
 
-    def get_sequence(self):
-        return self.cards[self.first_card_of_valid_sequence() :]
+    def get_sequence(self) -> list[CardSequence]:
+        first_card_id = self.first_card_of_valid_sequence()
+        return cards_to_sequences(self.cards[first_card_id:], first_id=first_card_id)
+
+    def get_accessible_sequences(self) -> list[CardSequence]:
+        """Return a list of CardSequence"""
+        first_card_id = self.first_card_of_valid_stacked()
+        return cards_to_sequences(self.cards[first_card_id:], first_id=first_card_id)
 
     def first_card_of_valid_stacked(self) -> int:
-        """Find the index of the first card of the valid sequence from the top."""
+        """Find the index of the first card of the valid sequence from the bottom."""
         for i in range(len(self.cards)):
             if self.is_valid_stacked_sequence(i):
                 return i
@@ -219,31 +226,6 @@ class Stack:
                 current_sequence = [cards[i]]
 
         all_stacked_sequences.append(current_sequence)
-        return all_stacked_sequences
-
-    def get_accessible_sequences(self) -> list[list[Card]]:
-        """
-        Generate a list of lists, where each inner list contains the cards in a valid sequences
-        from each stack on the board.
-
-        This function iterates through each stack on the board, examining the stacked cards.
-        It creates a list for each valid stacked sequence and adds these lists to an outer list.
-
-        :return: A list of lists, each containing the cards in a valid stacked sequence.
-        """
-        all_stacked_sequences = []
-
-        cards = self.get_stacked()
-        if cards:
-            current_sequence = [cards[0]]
-            for i in range(1, len(cards)):
-                if cards[i - 1].can_sequence(cards[i]):
-                    current_sequence.append(cards[i])
-                else:
-                    all_stacked_sequences.append(current_sequence)
-                    current_sequence = [cards[i]]
-
-            all_stacked_sequences.append(current_sequence)
         return all_stacked_sequences
 
 
