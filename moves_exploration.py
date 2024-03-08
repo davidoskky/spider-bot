@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
-from collections import deque
-from typing import TYPE_CHECKING, NamedTuple, Optional
+from collections import deque, namedtuple
+from typing import TYPE_CHECKING, NamedTuple, Optional, Sequence
 
+from cardSequence import CardSequence, cards_to_sequences
 from deck import Card
 
 if TYPE_CHECKING:
@@ -769,7 +770,7 @@ def is_beneficial_merge(
 
 
 def can_move_stacked_reversibly(
-    stacked_cards, stacks: list[Stack], empty_stacks=0, strict=False
+    stacked_cards: list[CardSequence], stacks: list[Stack], empty_stacks=0, strict=False
 ):
     """
     Determine if stacked card sequences can be moved reversibly given the empty stacks.
@@ -801,8 +802,8 @@ def degrees_of_freedom_for_empty_stacks(empty_stacks: int) -> int:
 
 
 def can_switch_stacked_reversibly(
-    first_stacked: list[list[Card]],
-    second_stacked: list[list[Card]],
+    first_stacked: list[CardSequence],
+    second_stacked: list[CardSequence],
     top_cards: list[Card],
     empty_stacks: int = 0,
 ) -> bool:
@@ -898,7 +899,7 @@ def can_switch_stacked_reversibly(
 
 
 def dof_to_move_stacked_reversibly(
-    stacked_cards: list[list[Card]], top_cards: list[Card]
+    sequences: list[CardSequence], top_cards: list[Card]
 ):
     """
     Calculate the degrees of freedom required to move stacked card sequences reversibly.
@@ -911,10 +912,7 @@ def dof_to_move_stacked_reversibly(
     current_dof_used = 0
     logging.debug(f"dof_to_move_stacked_reversibly: top cards = {repr(top_cards)}")
 
-    if stacked_cards and isinstance(stacked_cards[0], Card):
-        stacked_cards = [stacked_cards]
-
-    for sequence in reversed(stacked_cards):
+    for sequence in reversed(sequences):
         if not sequence:
             continue
         logging.debug(f"dof_to_move_stacked_reversibly: sequence = {repr(sequence)}")
@@ -1528,24 +1526,6 @@ def _translate_optimal_moves(
         translated_moves.append((new_src, new_dst))
 
     return translated_moves
-
-
-def cards_to_sequences(cards: list[Card]) -> list[list[Card]]:
-    """Takes a list of cards and returns a list of sequences"""
-    sequences: list[list[Card]] = []
-    if not cards:
-        return sequences
-    current_sequence: list[Card] = [cards[0]]
-    for card in cards[1:]:
-        if current_sequence[-1].can_sequence(card):
-            current_sequence.append(card)
-        else:
-            sequences.append(current_sequence)
-            current_sequence = [card]
-    if current_sequence:
-        sequences.append(current_sequence)
-
-    return sequences
 
 
 def _select_stacks_to_free(board: Board) -> list[int]:
