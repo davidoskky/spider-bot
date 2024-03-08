@@ -4,8 +4,10 @@ import random
 from moves_exploration import (DEFAULT_WEIGHTS, Move,
                                find_improved_equivalent_position,
                                find_move_increasing_stacked_length,
+                               find_move_increasing_stacked_length_manual,
                                find_moves_freeing_covered_cards,
-                               find_progressive_actions, free_stack,
+                               find_progressive_actions,
+                               find_progressive_actions_manual, free_stack,
                                is_board_winnable, score_board)
 from spiderSolitaire import SpiderSolitaire
 
@@ -23,7 +25,7 @@ class SpiderSolitaireBot:
         :return: The best move (action) to take.
         """
         best_path, best_score = self.select_best_scoring_path(
-            find_progressive_actions(self.game.board), weights
+            find_progressive_actions_manual(self.game.board), weights
         )
 
         return best_path, best_score
@@ -73,12 +75,13 @@ class SpiderSolitaireBot:
                 if verbose > 0:
                     print(description)
                     print(moves)
-                self.game.board.execute_moves(moves)
+                self.game.execute_moves(moves)
                 current_score = score_board(self.game.board, weights)
                 moves_made = True
 
         while True:
-            self.game.display_game_state()
+            if verbose > 0:
+                self.game.display_game_state()
             moves_made = False
 
             try_execute_moves(free_stack(self.game.board), "Free Stack")
@@ -87,19 +90,19 @@ class SpiderSolitaireBot:
                 find_improved_equivalent_position(self.game.board), "Improved"
             )
             try_execute_moves(
-                find_move_increasing_stacked_length(self.game.board), "Stacked"
+                find_move_increasing_stacked_length_manual(self.game.board), "Stacked"
             )
 
             if not moves_made:
                 progressive_path, score = self.select_best_progressive_action(weights)
                 try_execute_moves(progressive_path, "Progressive")
 
-            if not moves_made:
-                all_other_moves, score = self.select_best_scoring_path(
-                    find_moves_freeing_covered_cards(self.game.board), weights
-                )
-                if all_other_moves and current_score < score:
-                    try_execute_moves(all_other_moves, "Other")
+            # if not moves_made:
+            #     all_other_moves, score = self.select_best_scoring_path(
+            #         find_moves_freeing_covered_cards(self.game.board), weights
+            #     )
+            #     if all_other_moves and current_score < score:
+            #         try_execute_moves(all_other_moves, "Other")
 
             # If still no moves were made and cards are in the deck, draw from deck
             if not moves_made and len(self.game.board.deck.cards) > 0:
@@ -112,7 +115,7 @@ class SpiderSolitaireBot:
             if not moves_made:
                 if verbose > 0:
                     print("No moves available.")
-                    break
+                break
 
             cycle += 1
             if verbose > 1:
