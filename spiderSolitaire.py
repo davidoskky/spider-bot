@@ -36,6 +36,9 @@ class Stack:
     def can_stack(self, card: Card) -> bool:
         return self.is_empty() or self.top_card().can_stack(card)
 
+    def can_sequence(self, card: Card) -> bool:
+        return not self.is_empty and self.top_card().can_sequence(card)
+
     def reveal_top_card(self):
         """Flip the top card to face-up."""
         if self.cards and self.first_visible_card >= len(self.cards):

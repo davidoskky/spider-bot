@@ -1637,13 +1637,22 @@ def find_partially_stackable(
 def find_stacks_to_move_card(
     board: Board, card: Card, ignored_stacks=[], ignore_empty=False
 ) -> list[int]:
-    """Return a list of stack id on which a given card may be moved"""
-    suitable_stacks = []
+    """Return a list of stack id on which a given card may be moved
+
+    The list is in order, the stacks which can sequence the card are listed first
+    """
+    sequencing_stacks = []
+    stacking_stacks = []
     for stack_id, stack in enumerate(board.stacks):
         if stack_id in ignored_stacks or (ignore_empty and stack.is_empty()):
             continue
+        if stack.can_sequence(card):
+            sequencing_stacks.append(stack_id)
         if stack.can_stack(card):
-            suitable_stacks.append(stack_id)
+            stacking_stacks.append(stack_id)
+
+    suitable_stacks = sequencing_stacks
+    suitable_stacks.extend(stacking_stacks)
     return suitable_stacks
 
 
