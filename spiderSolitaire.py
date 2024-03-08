@@ -15,7 +15,6 @@ class Stack:
     def __init__(self, cards: list[Card]):
         self.cards = cards
         self.first_visible_card = len(cards) - 1
-        self.first_accessible_sequence = self.first_card_of_valid_sequence()
 
     def __repr__(self):
         representation = [
@@ -27,7 +26,6 @@ class Stack:
     def clone(self):
         cloned_stack = Stack(copy.copy(self.cards))
         cloned_stack.first_visible_card = self.first_visible_card
-        cloned_stack.first_accessible_sequence = self.first_accessible_sequence
         return cloned_stack
 
     def is_visible(self, card_index: int) -> bool:
@@ -102,12 +100,11 @@ class Stack:
         return self.cards[: self.first_visible_card]
 
     def is_movable(self, card_index: int) -> bool:
-        return card_index >= self.first_accessible_sequence
+        return card_index >= self.first_card_of_valid_sequence()
 
-    def add_sequence(self, sequence):
+    def add_sequence(self, sequence: list[Card]):
         """Add a sequence of cards to the stack"""
         self.cards.extend(sequence)
-        self.first_accessible_sequence = self.first_card_of_valid_sequence()
 
     def pop_sequence(self, start_index):
         if not self.is_visible(start_index):
@@ -115,7 +112,6 @@ class Stack:
         sequence = self.cards[start_index:]
         self.cards = self.cards[:start_index]
         self.reveal_top_card()
-        self.first_accessible_sequence = self.first_card_of_valid_sequence()
         return sequence
 
     def top_card(self):
@@ -125,7 +121,7 @@ class Stack:
         return not self.cards
 
     def first_card_of_valid_sequence(self) -> int:
-        """Find the index of the first card of the valid sequence from the top."""
+        """Find the index of the first card of the valid sequence from the bottom."""
         for i in range(self.first_visible_card, len(self.cards)):
             if self.is_valid_suit_sequence(i):
                 return i
@@ -136,14 +132,14 @@ class Stack:
 
     def first_card_not_in_sequence(self):
         """Find the index of the first card that is not in sequence from the top."""
-        i = self.first_accessible_sequence
+        i = self.first_card_of_valid_sequence()
         if i > 0:
             return i - 1
         else:
             return None
 
     def get_sequence(self):
-        return self.cards[self.first_accessible_sequence :]
+        return self.cards[self.first_card_of_valid_sequence() :]
 
     def first_card_of_valid_stacked(self) -> int:
         """Find the index of the first card of the valid sequence from the top."""
@@ -378,7 +374,7 @@ class Board:
         moves = []
         for i, from_stack in enumerate(self.stacks):
             for card_index in range(
-                from_stack.first_accessible_sequence, len(from_stack.cards)
+                from_stack.first_card_of_valid_sequence(), len(from_stack.cards)
             ):
                 moves.extend(self._get_valid_moves_to_other_stacks(i, card_index))
         return moves
@@ -547,7 +543,7 @@ class Board:
                 continue
 
             # Check if the entire visible sequence can be moved
-            top_sequence_start = stack.first_accessible_sequence
+            top_sequence_start = stack.first_card_of_valid_sequence()
             if top_sequence_start == 0 and self._get_valid_moves_to_other_stacks(
                 stack_index, 0
             ):
@@ -746,7 +742,7 @@ class SpiderSolitaire:
         to_stack = self.board.stacks[to_stack_index]
 
         if to_stack.is_empty():
-            card_index = from_stack.first_accessible_sequence
+            card_index = from_stack.first_card_of_valid_sequence()
             self.move(from_stack, to_stack, card_index)
             return True
 
