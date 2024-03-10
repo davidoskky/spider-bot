@@ -241,7 +241,7 @@ def find_progressive_actions_manual(board: Board) -> list[list[Move]]:
             if target_card_index is None:
                 continue
 
-            moves = move_card_to_top(
+            moves = move_card_splitting(
                 board, source_stack_index, target_stack_index, first_stacked_card_id
             )
             if moves:
@@ -501,11 +501,11 @@ def is_stacked_improved(
     :return: True if the resulting sequence in the target stack is valid and longer than the original, False otherwise.
     """
 
-    if (
-        source_card_id < source_stack.first_card_of_valid_stacked()
-        or target_card_id < target_stack.first_card_of_valid_stacked()
+    if not source_stack.is_stacked(source_card_id) or not target_stack.is_stacked(
+        target_card_id
     ):
         raise ValueError("Invalid card accessed")
+
     source_sequence = source_stack.cards[source_card_id:]
     target_sequence = target_stack.cards[
         target_stack.first_card_of_valid_stacked() : target_card_id + 1
@@ -631,7 +631,7 @@ def move_cards_removing_interfering(
     )
     cloned_board.execute_moves(clearance_moves)
 
-    moves_to_complete_switch = move_card_to_top(
+    moves_to_complete_switch = move_card_splitting(
         cloned_board, source_stack_id, target_stack_id, source_card_id
     )
     if moves_to_complete_switch:
@@ -653,7 +653,7 @@ def move_cards_removing_interfering(
             ignored_stacks=[source_stack_id],
         )
         cloned_board.execute_moves(second_clearance_moves)
-        moves_to_complete_switch = move_card_to_top(
+        moves_to_complete_switch = move_card_splitting(
             cloned_board, source_stack_id, target_stack_id, source_card_id
         )
         if moves_to_complete_switch:
@@ -1008,7 +1008,9 @@ def _move_stacked_to_temporary_position(
         logging.debug(
             f"_move_stacked_to_temporary_position: stack = {stack_id}, card = {card_index}, temporary = {temporary_stack_id}"
         )
-        moves = move_card_to_top(cloned_board, stack_id, temporary_stack_id, card_index)
+        moves = move_card_splitting(
+            cloned_board, stack_id, temporary_stack_id, card_index
+        )
         if moves:
             break
 
@@ -1048,7 +1050,7 @@ def free_stack(
             logging.debug("free_stack: No target stack found, cannot move the sequence")
             continue
 
-        temp_moves = move_card_to_top(board, stack_id, target_stack_id, 0)
+        temp_moves = move_card_splitting(board, stack_id, target_stack_id, 0)
 
         logging.debug(f"free_stack: temp_moves = {temp_moves}")
 
@@ -1180,6 +1182,249 @@ def _move_away_direct(
     return []
 
 
+def move_card_to_top(board: Board, source_id, target_id, card_id) -> list[Move]:
+    """Produces a series of moves which lead to moving one specific card to the top of another stack through reversible moves"""
+    # TODO: This function does not work as expected. It should integrate an algorithm which allows it to move the downward stacks if those are blocking.
+    func_name = "move_card_to_top"
+    moves: list[Move] = []
+    cloned_board = board.clone()
+
+    source_stack = cloned_board.get_stack(source_id)
+    target_stack = cloned_board.get_stack(target_id)
+
+    logging.debug(
+        f"{func_name}: Attempting to move card from stack {source_id} to stack {target_id}, card index: {card_id}"
+    )
+
+    # Ensure the card to move is within the stack
+    if card_id >= len(source_stack.cards):
+        logging.error(
+            f"{func_name}: Card index {card_id} out of stack {source_id} bounds"
+        )
+        cloned_board.display_game_state()
+        raise ValueError("Card index out of stack")
+    if not target_stack.can_stack(source_stack.cards[card_id]):
+        logging.debug(
+            f"{func_name}: Target stack cannot accept the card, no moves made"
+        )
+        return moves
+
+    while True:
+        if _can_be_moved_directly(cloned_board, source_id, target_id, card_id):
+            direct_moves = _move_card_to_no_splits(
+                cloned_board, source_id, target_id, card_id
+            )
+            moves.extend(direct_moves)
+            logging.debug(
+                f"{func_name}: Card moved directly with moves: {direct_moves}"
+            )
+            break
+
+        if not board.card_exists(source_id, card_id):
+            logging.debug(f"{func_name}: No more cards to move, exiting loop")
+            moves = []
+            break
+
+        sequences_to_move = source_stack.get_accessible_sequences(first_card_id=card_id)
+
+        multiple_sequences_to_move = len(sequences_to_move) > 1
+
+        # If there are multiple sequences in the stacked sequence, attmpt to
+        # move the ones above the sequence to move
+        if multiple_sequences_to_move:
+            # Attempt reversible moves with and without considering splits
+            first_card_in_following_sequence = card_id + len(sequences_to_move[0])
+            reversible_moves = _reversible_move_away_from_stack(
+                cloned_board,
+                source_id,
+                first_card_in_following_sequence,
+                [source_id],
+            )
+
+            if reversible_moves:
+                logging.debug(
+                    f"{func_name}: Reversible moves found: {reversible_moves}"
+                )
+                moves.extend(reversible_moves)
+                cloned_board.execute_moves(reversible_moves)
+                continue
+
+        logging.debug(
+            f"{func_name}: No reversible moves found, attempting to free up space"
+        )
+        # If no reversible moves are found, attempt to free up space
+        clearing_moves = free_stack(
+            cloned_board, ignored_stacks=[source_id], stacks_not_to_move_to=[target_id]
+        )
+        if not clearing_moves:
+            logging.debug(f"{func_name}: No moves to free up space, exiting")
+            moves = []
+            break
+        logging.debug(f"{func_name}: Freeing moves found: {clearing_moves}")
+        moves.extend(clearing_moves)
+        cloned_board.execute_moves(clearing_moves)
+
+    logging.debug(f"{func_name}: Total moves made: {moves}")
+    return moves
+
+
+def move_card_splitting(
+    board: Board, source_id: int, target_id: int, card_to_move: int
+) -> list[Move]:
+    """Move a card to another stack moving sequences on top of it on free stacks or on top of other cards"""
+    cloned_board = board.clone()
+    moves = []
+
+    card = cloned_board.get_card(source_id, card_to_move)
+    if card is None:
+        logging.error(
+            f"move_card_splitting: Card index {card_to_move} out of stack {source_id} bounds"
+        )
+        cloned_board.display_game_state()
+        raise ValueError("Card index out of stack")
+
+    if not cloned_board.get_stack(target_id).can_stack(card):
+        logging.debug(
+            f"move_card_splitting: Target stack cannot accept the card, no moves made"
+        )
+        return moves
+
+    sequences = cloned_board.get_stack(source_id).get_accessible_sequences(
+        first_card_id=card_to_move
+    )
+    logging.debug(f"Sequences: {sequences}")
+    if not sequences:
+        return []
+
+    available_dof = dof_board(cloned_board)
+    last_available_dof = available_dof
+    if cloned_board.get_stack(target_id).is_empty():
+        last_available_dof = max(0, last_available_dof - 1)
+
+    # We know the first sequence is movable as we have previously checked
+    ids_sequences_can_move = [0]
+
+    # Condition to determine if the move is possible
+    if len(sequences) > 1:
+        # TODO: This algorithm is not correct.
+        # It should only consider the movability of cards which are covered by a sequence.
+        # It is useless otherwise
+        for i, sequence in enumerate(sequences[1:], start=1):
+            found = False
+            for card in sequence:
+                available_stacks = find_stacks_to_move_card(
+                    cloned_board, card, ignore_empty=True
+                )
+
+                if available_stacks:
+                    ids_sequences_can_move.append(i)
+                    found = True
+                    break
+            if found:
+                continue
+
+    differences: list[int] = []
+    for i, j in zip(ids_sequences_can_move[1:], ids_sequences_can_move):
+        differences.append(i - j - 1)
+    if ids_sequences_can_move[-1] != len(sequences) - 1:
+        differences.append(len(sequences) - 1 - ids_sequences_can_move[-1])
+
+    possible = False
+
+    if last_available_dof >= len(sequences) - 1:
+        possible = True
+
+    if not possible and not differences:
+        return []
+
+    if not possible and differences[0] > last_available_dof:
+        return []
+    if not possible and max(differences) > available_dof:
+        return []
+
+    # This while loop is dangerous as it could get us into an infinite loop.
+    # The condition for success should be checked very well before it.
+    # Take extreme care when editing this function.
+    while sequences:
+        if last_available_dof >= len(sequences) - 1:
+            moves.extend(
+                _move_card_to_no_splits(
+                    cloned_board, source_id, target_id, card_to_move
+                )
+            )
+            break
+
+        previous_iteration_length = len(sequences)
+        # Iteratively remove full sequences until possible. Else, attempt moving single cards.
+        # From the first accessible sequence attempt to go towards the topmost one, unless
+        # there are more in a row than available DoF which cannot be moved.
+        move_made = False
+        for i in range(len(sequences) - 1, len(sequences) - 1 - available_dof - 1, -1):
+            sequence = sequences[i]
+            logging.debug(f"Sequence considered in iteration: {sequence}")
+            available_stacks = find_stacks_to_move_card(
+                cloned_board, sequence.top_card(), ignore_empty=True
+            )
+
+            if available_stacks:
+                partial_moves = _move_card_to_no_splits(
+                    cloned_board,
+                    source_id,
+                    available_stacks[0],
+                    sequence.start_index,
+                )
+                moves.extend(partial_moves)
+                cloned_board.execute_moves(partial_moves)
+                del sequences[i:]
+                move_made = True
+                break
+
+        # If there are still sequences, then we have to move things one card at a time.
+        # Attempt to move the topmost card which can be moved.
+        # The topmost accessible sequence should not be considered, but that is not necessary as it
+        # Should be handled above, as such, if we observe it it may be good to raise an Error
+        # At this point, sequences should be longer that the available DoF, otherwise an error appened somewhere
+        if not move_made:
+            if last_available_dof >= len(sequences) - 1:
+                raise SystemError("This should never happen. Please, fix my algorithm.")
+
+            # Starting from the topmost attempt to move single cards in the most bottom
+            # sequences, considering a number of sequences equal to the DoF
+            # Don't consider the last sequence as it makes no difference to move a card from there
+            for i in range(len(sequences) - available_dof - 1, len(sequences) - 1):
+                sequence = sequences[i]
+                for j, card in enumerate(sequence, start=0):
+                    available_stacks = find_stacks_to_move_card(
+                        cloned_board, card, ignore_empty=True
+                    )
+
+                    if available_stacks:
+                        partial_moves = _move_card_to_no_splits(
+                            cloned_board,
+                            source_id,
+                            available_stacks[0],
+                            sequence.start_index + j,
+                        )
+                        moves.extend(partial_moves)
+                        cloned_board.execute_moves(partial_moves)
+                        # Delete sequences following the current one. This one has not been fully moved yet.
+                        # Deleting the cards from the sequence is not required as it won't be considered on the
+                        # Following iteration.
+                        del sequences[i + 1 :]
+                        move_made = True
+                        break
+                if move_made:
+                    break
+
+        if previous_iteration_length == len(sequences):
+            # TODO: This return statement is a temporary fix.
+            # I imagine it works perfectly but the truth is that we should check above and never reach this point.
+            return []
+            raise SystemError("This should never happen. Please, fix my algorithm.")
+
+    return moves
+
+
 def _can_be_moved_directly(board: Board, source_id, target_id, card_to_move):
     cloned_board = board.clone()
     available_dof = dof_board(cloned_board)
@@ -1226,6 +1471,10 @@ def _move_card_to_no_splits(
     sequences = cards_to_sequences(source_stack.cards[card_to_move:])
     logging.debug(f"_move_card_to_no_splits: sequences = {sequences}")
 
+    logging.debug(
+        f"source: {source_id}, target: {target_id}, card: {card_to_move}, sequences: {sequences}"
+    )
+
     if not _can_be_moved_directly(board, source_id, target_id, card_to_move):
         return moves
 
@@ -1268,93 +1517,6 @@ def _move_card_to_no_splits(
         move = Move(source_id, target_id, card_to_move)
         moves.append(move)
     logging.debug(f"_move_card_to_no_splits: moves = {moves}")
-    return moves
-
-
-def move_card_to_top(board: Board, source_id, target_id, card_id) -> list[Move]:
-    """Produces a series of moves which lead to moving one specific card to the top of another stack through reversible moves"""
-    # TODO: This function does not work as expected. It should integrate an algorithm which allows it to move the downward stacks if those are blocking.
-    func_name = "move_card_to_top"
-    moves: list[Move] = []
-    cloned_board = board.clone()
-
-    source_stack = cloned_board.get_stack(source_id)
-    target_stack = cloned_board.get_stack(target_id)
-
-    logging.debug(
-        f"{func_name}: Attempting to move card from stack {source_id} to stack {target_id}, card index: {card_id}"
-    )
-
-    # Ensure the card to move is within the stack
-    if card_id >= len(source_stack.cards):
-        logging.error(
-            f"{func_name}: Card index {card_id} out of stack {source_id} bounds"
-        )
-        cloned_board.display_game_state()
-        raise ValueError("Card index out of stack")
-    if not target_stack.can_stack(source_stack.cards[card_id]):
-        logging.debug(
-            f"{func_name}: Target stack cannot accept the card, no moves made"
-        )
-        return moves
-
-    while True:
-        if _can_be_moved_directly(cloned_board, source_id, target_id, card_id):
-            direct_moves = _move_card_to_no_splits(
-                cloned_board, source_id, target_id, card_id
-            )
-            moves.extend(direct_moves)
-            logging.debug(
-                f"{func_name}: Card moved directly with moves: {direct_moves}"
-            )
-            break
-
-        if not board.card_exists(source_id, card_id):
-            logging.debug(f"{func_name}: No more cards to move, exiting loop")
-            moves = []
-            break
-
-        cards_to_move = source_stack.cards[card_id:]
-        sequences_to_move = cards_to_sequences(cards_to_move)
-
-        multiple_sequences_to_move = len(sequences_to_move) > 1
-
-        # If there are multiple sequences in the stacked sequence, attmpt to
-        # move the ones above the sequence to move
-        if multiple_sequences_to_move:
-            # Attempt reversible moves with and without considering splits
-            first_card_in_following_sequence = card_id + len(sequences_to_move[0])
-            reversible_moves = _reversible_move_away_from_stack(
-                cloned_board,
-                source_id,
-                first_card_in_following_sequence,
-                [source_id],
-            )
-
-            if reversible_moves:
-                logging.debug(
-                    f"{func_name}: Reversible moves found: {reversible_moves}"
-                )
-                moves.extend(reversible_moves)
-                cloned_board.execute_moves(reversible_moves)
-                continue
-
-        logging.debug(
-            f"{func_name}: No reversible moves found, attempting to free up space"
-        )
-        # If no reversible moves are found, attempt to free up space
-        clearing_moves = free_stack(
-            cloned_board, ignored_stacks=[source_id], stacks_not_to_move_to=[target_id]
-        )
-        if not clearing_moves:
-            logging.debug(f"{func_name}: No moves to free up space, exiting")
-            moves = []
-            break
-        logging.debug(f"{func_name}: Freeing moves found: {clearing_moves}")
-        moves.extend(clearing_moves)
-        cloned_board.execute_moves(clearing_moves)
-
-    logging.debug(f"{func_name}: Total moves made: {moves}")
     return moves
 
 
