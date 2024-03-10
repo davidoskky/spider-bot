@@ -17,6 +17,9 @@ class CardSequence(collections.abc.Sequence):
     def __getitem__(self, index):
         return self.cards[index]
 
+    def __repr__(self):
+        return repr(self.cards)
+
     def top_card(self):
         return self.cards[0]
 
