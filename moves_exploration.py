@@ -1134,32 +1134,44 @@ def move_card_splitting(
         last_available_dof = max(0, last_available_dof - 1)
 
     # We know the first sequence is movable as we have previously checked
-    ids_sequences_can_move = [0]
+    movable_sequences = [0]
 
-    # Condition to determine if the move is possible
-    if len(sequences) > 1:
-        # TODO: This algorithm is not correct.
-        # It should only consider the movability of cards which are covered by a sequence.
-        # It is useless otherwise
-        for i, sequence in enumerate(sequences[1:], start=1):
-            found = False
-            for card in sequence:
+    # Reverse the iteration of sequences, starting from the last down to the second sequence
+    # Note: The first sequence is skipped as it's handled separately
+    # The flag 'cards_above' indicates if there are cards above the current sequence that block movement
+    cards_above = False
+    for i in range(len(sequences) - 1, 0, -1):
+        sequence = sequences[i]
+
+        # When there are no cards above, consider only the first card of the sequence, useless to move the other ones
+        if not cards_above:
+            card = sequence[0]
+            available_stacks = find_stacks_to_move_card(
+                cloned_board, card, ignore_empty=True
+            )
+            if available_stacks:
+                movable_sequences.append(i)
+                continue
+            else:
+                cards_above = True
+        else:
+            for j, card in enumerate(sequence):
                 available_stacks = find_stacks_to_move_card(
                     cloned_board, card, ignore_empty=True
                 )
-
                 if available_stacks:
-                    ids_sequences_can_move.append(i)
-                    found = True
+                    movable_sequences.append(i)
+                    # Update the blocking flag, False if we moved the first card
+                    cards_above = j != 0
                     break
-            if found:
-                continue
+
+    movable_sequences.sort()
 
     differences: list[int] = []
-    for i, j in zip(ids_sequences_can_move[1:], ids_sequences_can_move):
+    for i, j in zip(movable_sequences[1:], movable_sequences):
         differences.append(i - j - 1)
-    if ids_sequences_can_move[-1] != len(sequences) - 1:
-        differences.append(len(sequences) - 1 - ids_sequences_can_move[-1])
+    if movable_sequences[-1] != len(sequences) - 1:
+        differences.append(len(sequences) - 1 - movable_sequences[-1])
 
     possible = False
 
@@ -1249,9 +1261,6 @@ def move_card_splitting(
                     break
 
         if previous_iteration_length == len(sequences):
-            # TODO: This return statement is a temporary fix.
-            # I imagine it works perfectly but the truth is that we should check above and never reach this point.
-            return []
             raise SystemError("This should never happen. Please, fix my algorithm.")
 
     return moves
