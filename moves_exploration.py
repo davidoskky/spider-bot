@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections import deque, namedtuple
-from typing import TYPE_CHECKING, NamedTuple, Optional, Sequence
+from collections import deque
+from typing import TYPE_CHECKING, NamedTuple
 
 from cardSequence import CardSequence, cards_to_sequences
 from deck import Card
