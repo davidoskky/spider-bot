@@ -142,9 +142,17 @@ class Stack:
         else:
             return None
 
-    def get_sequence(self) -> list[CardSequence]:
+    def get_sequence(self) -> CardSequence:
         first_card_id = self.first_card_of_valid_sequence()
-        return cards_to_sequences(self.cards[first_card_id:], first_id=first_card_id)
+        sequences = cards_to_sequences(
+            self.cards[first_card_id:], first_id=first_card_id
+        )
+        if len(sequences) > 1:
+            raise SystemError("Cards not in sequence")
+        elif sequences:
+            return sequences[0]
+        else:
+            return CardSequence([], 0)
 
     def get_accessible_sequences(self, first_card_id=None) -> list[CardSequence]:
         """Return a list of CardSequence"""
