@@ -5,6 +5,7 @@ import pytest
 from deck import Card, Deck
 from moves_exploration import move_cards_removing_interfering
 from spiderSolitaire import Board, Stack
+from util_tests import generate_board_from_string
 
 
 def test_switch_sequences_can_sequence():
@@ -118,3 +119,23 @@ def test_error_13_02():
     logging.debug(result)
     assert result != [], "A solution is available"
     # assert len(result) == 6, "The shortest solution requires 6 moves"
+
+
+def test_error_14_02():
+    board = generate_board_from_string(
+        """Stack 0:
+    Stack 1: XX XX 8♦ 11♠ 10♣ 9♣ 8♣ 7♣ 6♣
+    Stack 2: XX XX XX XX XX 1♣ 4♣ 3♦ 2♦ 1♦
+    Stack 3: XX 5♦ 4♣ 3♣ 2♣ 1♦
+    Stack 4: XX XX 13♦ 12♦ 11♠ 10♠ 9♠ 8♠ 7♠ 6♥ 5♥ 4♣ 3♥ 2♣
+    Stack 5:
+    Stack 6:
+    Stack 7: 12♣ 11♦ 10♣ 9♣ 8♣ 7♠ 6♣
+    Stack 8: 3♦ 11♦ 10♦ 9♥
+    Stack 9: 6♦
+    """
+    )
+
+    result = move_cards_removing_interfering(board, 7, 4, 1)
+
+    assert result != [], "Should move 7 to 4"
