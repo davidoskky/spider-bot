@@ -967,6 +967,7 @@ def move_card_splitting(
     board: Board, source_id: int, target_id: int, card_to_move: int
 ) -> list[Move]:
     """Move a card to another stack moving sequences on top of it on free stacks or on top of other cards"""
+    # TODO: There should be a function analogue to this one which also reorganizes the cards bringing them all in the target stack
     cloned_board = board.clone()
     moves = []
 
@@ -1080,11 +1081,12 @@ def move_card_splitting(
                     available_stacks[0],
                     sequence.start_index,
                 )
-                moves.extend(partial_moves)
-                cloned_board.execute_moves(partial_moves)
-                del sequences[i:]
-                move_made = True
-                break
+                if partial_moves:
+                    moves.extend(partial_moves)
+                    cloned_board.execute_moves(partial_moves)
+                    del sequences[i:]
+                    move_made = True
+                    break
 
         # If there are still sequences, then we have to move things one card at a time.
         # Attempt to move the topmost card which can be moved.
@@ -1112,14 +1114,16 @@ def move_card_splitting(
                             available_stacks[0],
                             sequence.start_index + j,
                         )
-                        moves.extend(partial_moves)
-                        cloned_board.execute_moves(partial_moves)
-                        # Delete sequences following the current one. This one has not been fully moved yet.
-                        # Deleting the cards from the sequence is not required as it won't be considered on the
-                        # Following iteration.
-                        del sequences[i + 1 :]
-                        move_made = True
-                        break
+                        if partial_moves:
+                            moves.extend(partial_moves)
+                            cloned_board.execute_moves(partial_moves)
+                            # Delete sequences following the current one. This one has not been fully moved yet.
+                            # Deleting the cards from the sequence is not required as it won't be considered on the
+                            # Following iteration.
+                            del sequences[i + 1 :]
+                            move_made = True
+                            break
+
                 if move_made:
                     break
 
@@ -1142,7 +1146,7 @@ def _can_be_moved_directly(board: Board, source_id, target_id, card_to_move):
     # TODO: I'm unsure this will fix all problems, probably it should be handled better
     if target_stack.is_empty() and available_dof > 0:
         available_dof -= 1
-    sequences = cards_to_sequences(source_stack.cards[card_to_move:])
+    sequences = source_stack.get_accessible_sequences(card_to_move)
 
     if not source_stack.is_stacked(card_to_move) or len(sequences) - 1 > available_dof:
         logging.debug(
