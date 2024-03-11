@@ -888,17 +888,21 @@ def free_stack(
         if stack_id in ignored_stacks:
             continue
 
+        temp_moves = []
         logging.debug(f"Trying to free stack = {stack_id}")
 
-        target_stack_id = find_stack_to_move_sequence(
+        target_stack_ids = find_stacks_to_move_card(
             cloned_board, board.get_card(stack_id, 0), ignored_stacks, ignore_empty=True
         )
 
-        if target_stack_id is None or target_stack_id in stacks_not_to_move_to:
-            logging.debug("free_stack: No target stack found, cannot move the sequence")
-            continue
+        for target_stack_id in target_stack_ids:
+            if target_stack_ids is None or target_stack_ids in stacks_not_to_move_to:
+                logging.debug(
+                    "free_stack: No target stack found, cannot move the sequence"
+                )
+                continue
 
-        temp_moves = move_card_splitting(board, stack_id, target_stack_id, 0)
+            temp_moves = move_card_splitting(board, stack_id, target_stack_id, 0)
 
         logging.debug(f"free_stack: temp_moves = {temp_moves}")
 
