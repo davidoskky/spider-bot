@@ -1014,7 +1014,7 @@ def _move_stacked_to_temporary_position(
         if moves:
             break
 
-    if clearing_moves:
+    if clearing_moves and moves:
         clearing_moves.extend(moves)
         moves = clearing_moves
 
