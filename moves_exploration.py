@@ -545,42 +545,6 @@ def is_stacked_improved(
     return len(source_sequence) > len(leaving_target)
 
 
-def search_for_beneficial_reversible_move(board: Board) -> bool:
-    """
-    Determine if there's a reversible move on the board that could lead to an improved position.
-    This function should be called after moving all possible cards that cover an empty stack through reversible moves.
-
-    :param board: The current state of the Spider Solitaire game board.
-    :return: True if a reversible move is found that improves the board position, False otherwise.
-    """
-    amount_of_stacks = len(board.stacks)
-    empty_stacks = board.count_empty_stacks()
-
-    for source_index, target_index in _generate_unique_index_pairs(amount_of_stacks):
-        source_stack = board.stacks[source_index]
-        source_sequences = source_stack.get_accessible_sequences()
-        logging.debug(
-            f"find_reversible_move: source_sequences = {repr(source_sequences)}"
-        )
-
-        target_stack = board.stacks[target_index]
-        target_sequences = target_stack.get_accessible_sequences()
-        logging.debug(
-            f"find_reversible_move: target_sequences = {repr(target_sequences)}"
-        )
-        if _check_for_reversible_move(
-            board,
-            source_sequences,
-            target_sequences,
-            source_index,
-            target_index,
-            empty_stacks,
-        ):
-            return True
-
-    return False
-
-
 def move_cards_removing_interfering(
     board: Board,
     source_stack_id: int,
@@ -607,7 +571,7 @@ def move_cards_removing_interfering(
     - list[Move]: A list of Move objects representing the required actions to relocate the card, including any temporary
       moves to clear interfering cards.
     """
-    # TODO: The logic should be simplified
+    # TODO: This should use sequences
     moves: list[Move] = []
     cloned_board = board.clone()
 
@@ -698,59 +662,6 @@ def move_cards_removing_interfering(
     return moves
 
 
-def _check_for_reversible_move(
-    board, source_sequences, target_sequences, source_index, target_index, empty_stacks
-):
-    for target_seq_index, target_sequence in enumerate(target_sequences):
-        for source_seq_index, source_sequence in enumerate(source_sequences):
-            beneficial_merge, beneficial_index = is_beneficial_merge(
-                target_sequence[-1], source_sequence
-            )
-            logging.debug(
-                f"find_reversible_move: beneficial_merge = {beneficial_merge}"
-            )
-
-            if beneficial_merge:
-                merged_sequence = _prepare_merged_sequence(
-                    source_sequence,
-                    beneficial_index,
-                    source_seq_index,
-                    source_sequences,
-                )
-                top_cards = get_top_cards_board(board, [source_index, target_index])
-                logging.debug(
-                    f"find_reversible_move: merged_sequence = {repr(merged_sequence)}"
-                )
-                logging.debug(
-                    f"find_reversible_move: target_sequences for switch = {repr(target_sequences[(target_seq_index + 1):])}"
-                )
-
-                if can_switch_stacked_reversibly(
-                    merged_sequence,
-                    target_sequences[(target_seq_index + 1) :],
-                    top_cards,
-                    empty_stacks,
-                ):
-                    return True
-    return False
-
-
-def _prepare_merged_sequence(
-    source_sequence, beneficial_index, source_seq_index, source_sequences
-):
-    merged_sequence = [source_sequence[beneficial_index:]]
-    if source_seq_index + 1 < len(source_sequences):
-        merged_sequence.extend(source_sequences[(source_seq_index + 1) :])
-    return merged_sequence
-
-
-def _generate_unique_index_pairs(amount_of_stacks):
-    for source_index in range(amount_of_stacks):
-        for target_index in range(amount_of_stacks):
-            if source_index != target_index:
-                yield source_index, target_index
-
-
 def get_top_cards_board(board: Board, ignored_stacks: list[int] = []) -> list[Card]:
     """
     Retrieves the top card from each stack in the board, excluding specified stacks and empty ones.
@@ -787,7 +698,7 @@ def get_top_cards(stacks: list[Stack]):
 
 
 def is_beneficial_merge(
-    target_card: Card, source_sequence: list[Card]
+    target_card: Card, source_sequence: CardSequence
 ) -> tuple[bool, int]:
     """
     Determine if merging the target sequence with the source sequence is beneficial.
@@ -884,14 +795,10 @@ def can_switch_stacked_reversibly(
 
     # Decide which stack to move first
     first_top_rank = (
-        first_stacked[-1][-1].rank
-        if first_stacked and first_stacked[-1]
-        else float("-inf")
+        first_stacked[0].top_card().rank if first_stacked else float("-inf")
     )
     second_top_rank = (
-        second_stacked[-1][-1].rank
-        if second_stacked and second_stacked[-1]
-        else float("-inf")
+        second_stacked[0].top_card().rank if second_stacked else float("-inf")
     )
 
     logging.debug(
@@ -919,14 +826,14 @@ def can_switch_stacked_reversibly(
 
     # Update available degrees of freedom
     while used_dof_initial > 0:
-        # At most 2^N/2 stacked sequences on the most full empty stack
-        max_stacked = pow(2, empty_stacks) / 2
+        # At most 2^(N - 1) stacked sequences on the most full empty stack
+        max_stacked = pow(2, empty_stacks - 1)
         empty_stacks -= 1
         used_dof_initial -= max_stacked
 
     available_dof = degrees_of_freedom_for_empty_stacks(empty_stacks)
 
-    top_cards.append(initial_stack[-1][-1])
+    top_cards.append(initial_stack[-1].bottom_card())
     dof_final_stack, _ = dof_to_move_stacked_reversibly(final_stack, top_cards)
     # -1 degree of freedom because the top sequence can directly be moved on top of the previous stack
     return available_dof >= dof_final_stack - 1
@@ -938,7 +845,7 @@ def dof_to_move_stacked_reversibly(
     """
     Calculate the degrees of freedom required to move stacked card sequences reversibly.
 
-    :param stacked_cards: List of lists, each representing a sequence of stacked cards.
+    :param stacked_cards: List of CardSequence, each representing a sequence of stacked cards.
     :param top_cards: List of the accessible top cards
     :return: The minimum degrees of freedom required to move the sequences.
     """
