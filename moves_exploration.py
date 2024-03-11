@@ -1465,30 +1465,6 @@ def find_placement_index_for_card(
     return None
 
 
-def find_partially_stackable(
-    board: Board, sequence: list[Card], ignored_stacks: list[int]
-) -> tuple[int, int]:
-    """
-    Finds a stack where a part of the given sequence can be stacked, starting from the second card in the sequence.
-
-    Parameters:
-    - board (Board): The current state of the board.
-    - sequence (list[Card]): The sequence of cards to check for partial stackability.
-    - ignored_stacks (list[int]): Indices of stacks to be ignored during the search.
-
-    Returns:
-    - tuple[int, int]: A tuple containing the index of the stack where the sequence can be partially stacked and the index within the sequence where stacking can start. Returns (-1, -1) if no such stack is found.
-    """
-    for sequence_index, card in enumerate(
-        sequence, start=1
-    ):  # start=1 to skip the top card
-        target_stack = find_stack_to_move_sequence(board, card, ignored_stacks)
-        if target_stack:
-            return target_stack, sequence_index
-
-    return (-1, -1)
-
-
 def find_stacks_to_move_card(
     board: Board, card: Card, ignored_stacks=[], ignore_empty=False
 ) -> list[int]:
@@ -1509,36 +1485,6 @@ def find_stacks_to_move_card(
     suitable_stacks = sequencing_stacks
     suitable_stacks.extend(stacking_stacks)
     return suitable_stacks
-
-
-def find_stack_to_move_sequence(
-    board: Board, top_card: Card, ignored_stacks: list[int] = [], ignore_empty=False
-) -> Optional[int]:
-    """
-    Find a stack to which the sequence can be legally moved.
-    If ignore_empty is false, empty stacks will be considered, but if a valid non empty stacks is
-    available it will be returned.
-
-    :param board: The current board state.
-    :param sequence: The sequence of cards to move.
-    :return: ID of the stack where the sequence can be moved, or None if not found.
-    """
-    suitable_empty_stack = None
-
-    for target_stack_id, target_stack in enumerate(board.stacks):
-        if target_stack_id in ignored_stacks:
-            continue
-
-        if not target_stack.is_empty() and target_stack.can_stack(top_card):
-            return target_stack_id
-
-        if suitable_empty_stack is None and target_stack.is_empty():
-            suitable_empty_stack = target_stack_id
-
-    if not ignore_empty and suitable_empty_stack is not None:
-        return suitable_empty_stack
-
-    return None
 
 
 def find_moves_freeing_covered_cards(board: Board):
