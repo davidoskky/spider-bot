@@ -607,19 +607,22 @@ def move_cards_removing_interfering(
     - list[Move]: A list of Move objects representing the required actions to relocate the card, including any temporary
       moves to clear interfering cards.
     """
-    # TODO: This should use sequences
+    # TODO: The logic should be simplified
     moves: list[Move] = []
     cloned_board = board.clone()
 
     target_stack = cloned_board.get_stack(target_stack_id)
-    source_stack = cloned_board.get_stack(source_stack_id)
-    moving_card = source_stack.cards[source_card_id]
+    moving_card = cloned_board.get_card(source_stack_id, source_card_id)
 
     target_card_id = find_placement_index_for_card(moving_card, target_stack)
     logging.debug(f"move_cards_removing_interfering: target_card_id = {target_card_id}")
     # Check if the card can be placed in the target stack
     if target_card_id is None:
         return moves
+
+    source_sequences = cloned_board.get_stack(source_stack_id).get_accessible_sequences(
+        source_card_id
+    )
 
     # Clear any cards covering the target position
     # Maybe this should be done by sequence as well
@@ -637,12 +640,13 @@ def move_cards_removing_interfering(
     if moves_to_complete_switch:
         moves.extend(clearance_moves)
         moves.extend(moves_to_complete_switch)
-    elif board.card_exists(source_stack_id, source_card_id + 1):
+    elif len(source_sequences) > 1:
         cloned_board = board.clone()
+        covering_sequence_id = source_sequences[1].start_index
         clearance_moves = _move_stacked_to_temporary_position(
             cloned_board,
             source_stack_id,
-            source_card_id + 1,
+            covering_sequence_id,
             ignored_stacks=[target_stack_id],
         )
         cloned_board.execute_moves(clearance_moves)
@@ -660,6 +664,36 @@ def move_cards_removing_interfering(
             moves.extend(clearance_moves)
             moves.extend(second_clearance_moves)
             moves.extend(moves_to_complete_switch)
+        else:
+            first_sequence = source_sequences[0]
+            for card_index in range(
+                source_card_id + 1, source_card_id + len(first_sequence)
+            ):
+                cloned_board = board.clone()
+                individual_clearance_moves = _move_stacked_to_temporary_position(
+                    cloned_board,
+                    source_stack_id,
+                    card_index,
+                    ignored_stacks=[target_stack_id],
+                )
+                cloned_board.execute_moves(individual_clearance_moves)
+                second_clearance_moves = _move_stacked_to_temporary_position(
+                    cloned_board,
+                    target_stack_id,
+                    target_card_id,
+                    ignored_stacks=[source_stack_id],
+                )
+                cloned_board.execute_moves(second_clearance_moves)
+
+                # Try the main move again after each individual card move
+                individual_moves_to_complete_switch = move_card_splitting(
+                    cloned_board, source_stack_id, target_stack_id, source_card_id
+                )
+                if individual_moves_to_complete_switch:
+                    moves.extend(individual_clearance_moves)
+                    moves.extend(second_clearance_moves)
+                    moves.extend(individual_moves_to_complete_switch)
+                    break
 
     return moves
 
