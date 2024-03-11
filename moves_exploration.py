@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, Optional
 
-from cardSequence import CardSequence, cards_to_sequences
+from cardSequence import CardSequence, StackedSequence, cards_to_sequences
 from deck import Card
 
 if TYPE_CHECKING:
@@ -266,26 +266,24 @@ def find_improved_equivalent_position(board: Board) -> list[Move]:
         if source_stack.is_empty():
             continue
 
-        # Consider the first card if it's the only card, otherwise consider only the first card in sequence
-        # TODO: What if the first stacked card is in sequence with the rest? This doesn't work
-        cards_to_consider = (
-            source_stack.cards
-            if source_stack.first_card_of_valid_stacked() == 0
-            else source_stack.get_stacked()[1:]
+        stacked_cards = StackedSequence(
+            source_stack.get_stacked(), source_stack.first_card_of_valid_stacked()
         )
+        # Consider the first card if it's the only card, otherwise consider only the first card in stacked sequence
+        if source_stack.first_card_of_valid_stacked() > 0:
+            stacked_cards.drop_top_card()
+
         logging.debug(
-            f"find_improved_equivalent_position_manual: cards_to_consider = {cards_to_consider}"
+            f"find_improved_equivalent_position_manual: cards_to_consider = {stacked_cards}"
         )
 
-        for card in cards_to_consider:
+        for card_index, card in enumerate(
+            stacked_cards, start=stacked_cards.start_index
+        ):
             if card.rank == 14:  # The king cannot be moved reversibly
                 continue
-            card_index = (
-                len(source_stack.cards) - 1 - source_stack.cards[::-1].index(card)
-            )
 
             for target_stack_index, target_stack in enumerate(board.stacks):
-                # Don't consider moving to empty stack, this check should not be necessary, but just in case
                 if target_stack_index == source_stack_index or target_stack.is_empty():
                     continue
 
@@ -302,10 +300,14 @@ def find_improved_equivalent_position(board: Board) -> list[Move]:
                 target_card = target_stack.cards[target_card_index]
                 if is_sequence_improved(source_stack, target_stack, card, target_card):
                     logging.debug(
-                        f"find_improved_equivalent_position_manual: source = {source_stack_index}, target = {target_stack_index}, card = {card_index}"
+                        f"find_improved_equivalent_position_manual: source = {source_stack_index}, target = {target_stack_index}, card = {card_index}, target card = {target_card_index}"
                     )
                     moves = move_cards_removing_interfering(
-                        board, source_stack_index, target_stack_index, card_index
+                        board,
+                        source_stack_index,
+                        target_stack_index,
+                        card_index,
+                        target_card_index + 1,
                     )
                     if moves:
                         return moves
@@ -404,10 +406,14 @@ def find_move_increasing_stacked_length_manual(board: Board) -> list[Move]:
                     source_stack, target_stack, card_index, target_card_index
                 ):
                     logging.debug(
-                        f"find_move_increasing_stacked_length: source = {source_stack_index}, target = {target_stack_index}, card = {card_index}"
+                        f"find_move_increasing_stacked_length: source = {source_stack_index}, target = {target_stack_index}, card = {card_index}, target card = {target_card_index}"
                     )
                     moves = move_cards_removing_interfering(
-                        board, source_stack_index, target_stack_index, card_index
+                        board,
+                        source_stack_index,
+                        target_stack_index,
+                        card_index,
+                        card_covering_target_index,
                     )
                     if moves:
                         return moves
@@ -449,6 +455,9 @@ def is_sequence_improved(
     :param target_index: The target position in the target stack.
     :return: True if the sequence is improved, False otherwise.
     """
+
+    if not target_card.can_sequence(source_card):
+        return False
 
     source_sequences = source_stack.get_accessible_sequences()
     target_sequences = target_stack.get_accessible_sequences()
@@ -550,6 +559,7 @@ def move_cards_removing_interfering(
     source_stack_id: int,
     target_stack_id: int,
     source_card_id: int,
+    target_card_id: Optional[int],
 ) -> list[Move]:
     """
     Relocates a card from a source stack to a destination stack within the game board. If the destination stack has
@@ -578,7 +588,8 @@ def move_cards_removing_interfering(
     target_stack = cloned_board.get_stack(target_stack_id)
     moving_card = cloned_board.get_card(source_stack_id, source_card_id)
 
-    target_card_id = find_placement_index_for_card(moving_card, target_stack)
+    if not target_card_id:
+        target_card_id = find_placement_index_for_card(moving_card, target_stack)
     logging.debug(f"move_cards_removing_interfering: target_card_id = {target_card_id}")
     # Check if the card can be placed in the target stack
     if target_card_id is None:
@@ -1145,7 +1156,7 @@ def _can_be_moved_directly(board: Board, source_id, target_id, card_to_move):
 
 
 def _move_card_to_no_splits(
-    board: Board, source_id, target_id, card_to_move
+    board: Board, source_id: int, target_id: int, card_to_move: int
 ) -> list[Move]:
     """
     Move a card to another stack reversibly, only if allowed by DoF directly with no intermediate exchanges.
@@ -1157,11 +1168,12 @@ def _move_card_to_no_splits(
     :return: List of Moves needed to perform the action.
     """
     # TODO: This is not the most optimal movement strategy
+    # TODO: This fails as it doesn't free the stacks which have been occupied
     moves: list[Move] = []
     cloned_board = board.clone()
     source_stack = cloned_board.get_stack(source_id)
     target_is_empty = cloned_board.get_stack(target_id).is_empty()
-    sequences = cards_to_sequences(source_stack.cards[card_to_move:])
+    sequences = source_stack.get_accessible_sequences(card_to_move)
     logging.debug(f"_move_card_to_no_splits: sequences = {sequences}")
 
     logging.debug(
@@ -1169,11 +1181,14 @@ def _move_card_to_no_splits(
     )
 
     if not _can_be_moved_directly(board, source_id, target_id, card_to_move):
-        return moves
+        return []
 
-    if len(sequences) > 1 and not target_is_empty:
+    if len(sequences) > 1:
         stack_to_stack_moves = _optimal_stacked_reversible_movement(
-            cloned_board, source_id, len(sequences) - 1
+            cloned_board,
+            source_id,
+            len(sequences) - 1 if not target_is_empty else len(sequences),
+            final_stack=target_id if target_is_empty else None,
         )
         if not stack_to_stack_moves:
             return []
@@ -1183,33 +1198,18 @@ def _move_card_to_no_splits(
             card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
             if start == source_id and card_id < card_to_move:
                 card_id = card_to_move
-            move = Move(start, dest, card_id)
-            cloned_board.move_by_index(*move)
-            moves.append(move)
-    if len(sequences) > 1 and target_is_empty:
-        stack_to_stack_moves = _optimal_stacked_reversible_movement(
-            cloned_board, source_id, len(sequences), final_stack=target_id
-        )
-        if not stack_to_stack_moves:
-            return []
 
-        for move_set in stack_to_stack_moves:
-            start, dest = move_set
-            card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
-            if start == source_id and card_id < card_to_move:
-                card_id = card_to_move
             move = Move(start, dest, card_id)
             cloned_board.move_by_index(*move)
             moves.append(move)
 
-    if len(sequences) == 1 and target_is_empty:
+    if len(sequences) == 1 or not target_is_empty:
         move = Move(source_id, target_id, card_to_move)
         moves.append(move)
+        cloned_board.move_by_index(*move)
 
-    if not target_is_empty:
-        move = Move(source_id, target_id, card_to_move)
-        moves.append(move)
     logging.debug(f"_move_card_to_no_splits: moves = {moves}")
+
     return moves
 
 
