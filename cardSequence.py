@@ -37,6 +37,15 @@ class CardSequence(collections.abc.Sequence):
     def bottom_card(self):
         return self.cards[-1]
 
+    def drop_card(self, card_to_drop: Card, drop_previous=False):
+        card_index = self.cards.index(card_to_drop)
+
+        if drop_previous:
+            self.cards = self.cards[card_index + 1 :]
+            self.start_index += card_index + 1
+        else:
+            self.cards = self.cards[:card_index]
+
 
 class StackedSequence(collections.abc.Sequence):
     """Sequence of cards in decreasing order"""
@@ -111,6 +120,25 @@ class StackedSequence(collections.abc.Sequence):
     def drop_sequence(self, sequence: CardSequence, drop_previous=False):
         index = self.sequences.index(sequence)
         self.drop_sequence_by_id(index, drop_previous)
+
+    def drop_card(self, card: Card, drop_previous=False):
+        for i, sequence in enumerate(self.sequences):
+            if card not in sequence:
+                continue
+
+            sequence.drop_card(card, drop_previous)
+
+            if drop_previous:
+                self.sequences = self.sequences[i:]
+            else:
+                self.sequences = self.sequences[: i + 1]
+
+            if not sequence.cards:
+                self.sequences.remove(sequence)
+
+            break
+        else:
+            raise ValueError("Card not found in any sequence.")
 
 
 def cards_to_sequences(cards: list[Card], first_id: int = 0) -> list[CardSequence]:
