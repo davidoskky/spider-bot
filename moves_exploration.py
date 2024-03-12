@@ -1056,7 +1056,7 @@ def move_card_splitting(
     while sequences:
         if last_available_dof >= len(sequences) - 1:
             moves.extend(
-                _move_card_to_no_splits(
+                _move_sequence_to_no_splits(
                     cloned_board, source_id, target_id, card_to_move
                 )
             )
@@ -1075,7 +1075,7 @@ def move_card_splitting(
             )
 
             if available_stacks:
-                partial_moves = _move_card_to_no_splits(
+                partial_moves = _move_sequence_to_no_splits(
                     cloned_board,
                     source_id,
                     available_stacks[0],
@@ -1108,7 +1108,7 @@ def move_card_splitting(
                     )
 
                     if available_stacks:
-                        partial_moves = _move_card_to_no_splits(
+                        partial_moves = _move_sequence_to_no_splits(
                             cloned_board,
                             source_id,
                             available_stacks[0],
@@ -1208,6 +1208,78 @@ def _move_card_to_no_splits(
             moves.append(move)
 
     if len(sequences) == 1 or not target_is_empty:
+        move = Move(source_id, target_id, card_to_move)
+        moves.append(move)
+        cloned_board.move_by_index(*move)
+
+    logging.debug(f"_move_card_to_no_splits: moves = {moves}")
+
+    return moves
+
+
+def _move_sequence_to_no_splits(
+    board: Board, source_id: int, target_id: int, card_to_move: int
+) -> list[Move]:
+    """
+    Move a card to another stack reversibly, only if allowed by DoF directly with no intermediate exchanges.
+
+    :param board: The current state of the Spider Solitaire game.
+    :param source_id: ID of the source stack.
+    :param target_id: ID of the target stack.
+    :param card_id: ID of the card in the source stack to start moving from.
+    :return: List of Moves needed to perform the action.
+    """
+    # TODO: This is not the most optimal movement strategy
+    # TODO: This fails as it doesn't free the stacks which have been occupied
+    moves: list[Move] = []
+    cloned_board = board.clone()
+    source_stack = cloned_board.get_stack(source_id)
+    target_is_empty = cloned_board.get_stack(target_id).is_empty()
+    sequences = source_stack.get_accessible_sequences(card_to_move)
+    logging.debug(f"_move_card_to_no_splits: sequences = {sequences}")
+
+    logging.debug(
+        f"source: {source_id}, target: {target_id}, card: {card_to_move}, sequences: {sequences}"
+    )
+
+    if not _can_be_moved_directly(board, source_id, target_id, card_to_move):
+        return []
+
+    if len(sequences) > 1:
+        stack_to_stack_moves = _optimal_stacked_reversible_movement(
+            cloned_board,
+            source_id,
+            len(sequences) - 1 if not target_is_empty else len(sequences),
+            final_stack=target_id if target_is_empty else None,
+        )
+        if not stack_to_stack_moves:
+            return []
+
+        if target_is_empty:
+            to_reverse = stack_to_stack_moves[:-2]
+        else:
+            to_reverse = stack_to_stack_moves[:]
+            stack_to_stack_moves.append((source_id, target_id))
+
+        for move in reversed(to_reverse):
+            start, dest = move
+            adjusted_move = (
+                dest if dest != source_id else target_id,
+                start if start != source_id else target_id,
+            )
+            stack_to_stack_moves.append(adjusted_move)
+
+        for move_set in stack_to_stack_moves:
+            start, dest = move_set
+            card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+            if start == source_id and card_id < card_to_move:
+                card_id = card_to_move
+
+            move = Move(start, dest, card_id)
+            cloned_board.move_by_index(*move)
+            moves.append(move)
+
+    elif len(sequences) == 1:
         move = Move(source_id, target_id, card_to_move)
         moves.append(move)
         cloned_board.move_by_index(*move)
