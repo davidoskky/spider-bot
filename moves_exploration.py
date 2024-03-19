@@ -1142,7 +1142,7 @@ def _can_stack_card_in_sequence(board, sequence: CardSequence) -> bool:
     return False
 
 
-def _can_be_moved_directly(board: Board, source_id, target_id, card_to_move):
+def _can_move_directly(board: Board, source_id, target_id, card_to_move):
     cloned_board = board.clone()
     available_dof = dof_board(cloned_board)
     source_stack = cloned_board.get_stack(source_id)
@@ -1193,7 +1193,7 @@ def _move_card_to_no_splits(
         f"source: {source_id}, target: {target_id}, card: {card_to_move}, sequences: {sequences}"
     )
 
-    if not _can_be_moved_directly(board, source_id, target_id, card_to_move):
+    if not _can_move_directly(board, source_id, target_id, card_to_move):
         return []
 
     if len(sequences) > 1:
@@ -1230,7 +1230,7 @@ def _move_sequence_to_no_splits(
     board: Board, source_id: int, target_id: int, card_to_move: int
 ) -> list[Move]:
     """
-    Move a card to another stack reversibly, only if allowed by DoF directly with no intermediate exchanges.
+    Move a card to another stack reversibly, only if allowed by DoF without moving cards on top of other cards.
 
     :param board: The current state of the Spider Solitaire game.
     :param source_id: ID of the source stack.
@@ -1251,7 +1251,7 @@ def _move_sequence_to_no_splits(
         f"source: {source_id}, target: {target_id}, card: {card_to_move}, sequences: {sequences}"
     )
 
-    if not _can_be_moved_directly(board, source_id, target_id, card_to_move):
+    if not _can_move_directly(board, source_id, target_id, card_to_move):
         return []
 
     if len(sequences) > 1:
