@@ -1019,8 +1019,9 @@ def move_card_splitting(
                 continue
             else:
                 if _can_stack_card_in_sequence(board, sequence):
-                    movable_sequences.append(i)
+                    movable_sequences.append(i + 1)
 
+    movable_sequences = list(set(movable_sequences))
     movable_sequences.sort()
 
     differences: list[int] = []
