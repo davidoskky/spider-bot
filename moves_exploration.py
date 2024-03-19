@@ -1007,25 +1007,19 @@ def move_card_splitting(
 
         # When there are no cards above, consider only the first card of the sequence, useless to move the other ones
         if not cards_above:
-            card = sequence[0]
-            available_stacks = find_stacks_to_move_card(
-                cloned_board, card, ignore_empty=True
-            )
-            if available_stacks:
+            if _can_stack_sequence(board, sequence):
                 movable_sequences.append(i)
                 continue
             else:
                 cards_above = True
         else:
-            for j, card in enumerate(sequence):
-                available_stacks = find_stacks_to_move_card(
-                    cloned_board, card, ignore_empty=True
-                )
-                if available_stacks:
+            if _can_stack_sequence(board, sequence):
+                movable_sequences.append(i)
+                cards_above = False
+                continue
+            else:
+                if _can_stack_card_in_sequence(board, sequence):
                     movable_sequences.append(i)
-                    # Update the blocking flag, False if we moved the first card
-                    cards_above = j != 0
-                    break
 
     movable_sequences.sort()
 
@@ -1129,6 +1123,22 @@ def move_card_splitting(
             raise SystemError("This should never happen. Please, fix my algorithm.")
 
     return moves
+
+
+def _can_stack_sequence(board, sequence):
+    available_stacks = find_stacks_to_move_card(board, sequence[0], ignore_empty=True)
+    if available_stacks:
+        return True
+    return False
+
+
+def _can_stack_card_in_sequence(board, sequence: CardSequence) -> bool:
+    # Check if a single card can be moved
+    for card in sequence:
+        available_stacks = find_stacks_to_move_card(board, card, ignore_empty=True)
+        if available_stacks:
+            return True
+    return False
 
 
 def _can_be_moved_directly(board: Board, source_id, target_id, card_to_move):
