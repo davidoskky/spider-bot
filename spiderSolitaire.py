@@ -3,7 +3,7 @@ from operator import is_
 from random import randint, random
 from typing import Optional
 
-from cardSequence import CardSequence, cards_to_sequences
+from cardSequence import CardSequence, StackedSequence, cards_to_sequences
 from deck import Card, Deck, SimpleDeck
 from moves_exploration import Move, find_progressive_actions
 
@@ -154,14 +154,14 @@ class Stack:
         else:
             return CardSequence([], 0)
 
-    def get_accessible_sequences(self, first_card_id=None) -> list[CardSequence]:
+    def get_accessible_sequences(self, first_card_id=None) -> StackedSequence:
         """Return a list of CardSequence"""
         if first_card_id is None:
             first_card_id = self.first_card_of_valid_stacked()
         elif first_card_id < self.first_card_of_valid_stacked():
             raise IndexError
 
-        return cards_to_sequences(self.cards[first_card_id:], first_id=first_card_id)
+        return StackedSequence(self.cards[first_card_id:], start_index=first_card_id)
 
     def first_card_of_valid_stacked(self) -> int:
         """Find the index of the first card of the valid sequence from the bottom."""

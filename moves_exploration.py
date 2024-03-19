@@ -1265,7 +1265,7 @@ def _move_sequence_to_no_splits(
             return []
 
         if target_is_empty:
-            to_reverse = stack_to_stack_moves[:-2]
+            to_reverse = stack_to_stack_moves[:-1]
         else:
             to_reverse = stack_to_stack_moves[:]
             stack_to_stack_moves.append((source_id, target_id))
@@ -1273,7 +1273,7 @@ def _move_sequence_to_no_splits(
         for move in reversed(to_reverse):
             start, dest = move
             adjusted_move = (
-                dest if dest != source_id else target_id,
+                dest,
                 start if start != source_id else target_id,
             )
             stack_to_stack_moves.append(adjusted_move)
@@ -1284,9 +1284,15 @@ def _move_sequence_to_no_splits(
             if start == source_id and card_id < card_to_move:
                 card_id = card_to_move
 
-            move = Move(start, dest, card_id)
-            cloned_board.move_by_index(*move)
-            moves.append(move)
+            # TODO: A better solution should be found for this problem
+            # The fact is that some times after an irreversible move it
+            # is not possible to move all cards to the destination stack
+            try:
+                move = Move(start, dest, card_id)
+                cloned_board.move_by_index(*move)
+                moves.append(move)
+            except ValueError as e:
+                return moves
 
     elif len(sequences) == 1:
         move = Move(source_id, target_id, card_to_move)
