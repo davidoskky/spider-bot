@@ -1052,7 +1052,8 @@ def move_card_splitting(
     # The condition for success should be checked very well before it.
     # Take extreme care when editing this function.
     while sequences:
-        if last_available_dof >= len(sequences) - 1:
+        k = len(sequences)
+        if last_available_dof >= k - 1:
             moves.extend(
                 _move_sequence_to_no_splits(
                     cloned_board, source_id, target_id, card_to_move
@@ -1060,12 +1061,11 @@ def move_card_splitting(
             )
             break
 
-        previous_iteration_length = len(sequences)
         # Iteratively remove full sequences until possible. Else, attempt moving single cards.
         # From the first accessible sequence attempt to go towards the topmost one, unless
         # there are more in a row than available DoF which cannot be moved.
         move_made = False
-        for i in range(len(sequences) - 1, len(sequences) - 1 - available_dof - 1, -1):
+        for i in range(k - 1, k - 1 - available_dof - 1, -1):
             sequence = sequences[i]
             logging.debug(f"Sequence considered in iteration: {sequence}")
             available_stacks = find_stacks_to_move_card(
@@ -1082,7 +1082,7 @@ def move_card_splitting(
                 if partial_moves:
                     moves.extend(partial_moves)
                     cloned_board.execute_moves(partial_moves)
-                    del sequences[i:]
+                    sequences.drop_sequence_by_id(i)
                     move_made = True
                     break
 
@@ -1092,13 +1092,13 @@ def move_card_splitting(
         # Should be handled above, as such, if we observe it it may be good to raise an Error
         # At this point, sequences should be longer that the available DoF, otherwise an error appened somewhere
         if not move_made:
-            if last_available_dof >= len(sequences) - 1:
+            if last_available_dof >= k - 1:
                 raise SystemError("This should never happen. Please, fix my algorithm.")
 
             # Starting from the topmost attempt to move single cards in the most bottom
             # sequences, considering a number of sequences equal to the DoF
             # Don't consider the last sequence as it makes no difference to move a card from there
-            for i in range(len(sequences) - available_dof - 1, len(sequences) - 1):
+            for i in range(k - available_dof - 1, k - 1):
                 sequence = sequences[i]
                 for j, card in enumerate(sequence, start=0):
                     available_stacks = find_stacks_to_move_card(
@@ -1118,14 +1118,14 @@ def move_card_splitting(
                             # Delete sequences following the current one. This one has not been fully moved yet.
                             # Deleting the cards from the sequence is not required as it won't be considered on the
                             # Following iteration.
-                            del sequences[i + 1 :]
+                            sequences.drop_sequence_by_id(i + 1)
                             move_made = True
                             break
 
                 if move_made:
                     break
 
-        if previous_iteration_length == len(sequences):
+        if k == len(sequences):
             raise SystemError("This should never happen. Please, fix my algorithm.")
 
     return moves
@@ -1308,7 +1308,7 @@ def _optimal_stacked_reversible_movement(
     if not empty_stacks:
         return []
 
-    if amount_of_sequences > 2 ^ (len(empty_stacks)) - 1:
+    if amount_of_sequences > pow(2, len(empty_stacks)) - 1:
         return []
 
     if amount_of_sequences < 1:
