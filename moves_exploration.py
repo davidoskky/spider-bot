@@ -983,9 +983,8 @@ def move_card_splitting(
         )
         return moves
 
-    sequences = cloned_board.get_stack(source_id).get_accessible_sequences(
-        first_card_id=card_to_move
-    )
+    source_stack = cloned_board.get_stack(source_id)
+    sequences = source_stack.get_accessible_sequences(first_card_id=card_to_move)
     logging.debug(f"Sequences: {sequences}")
 
     available_dof = dof_board(cloned_board)
@@ -1016,8 +1015,7 @@ def move_card_splitting(
         # From the first accessible sequence attempt to go towards the topmost one, unless
         # there are more in a row than available DoF which cannot be moved.
         move_made = False
-        for i in range(k - 1, k - 1 - available_dof - 1, -1):
-            sequence = sequences[i]
+        for sequence in reversed(sequences[-available_dof - 1 :]):
             logging.debug(f"Sequence considered in iteration: {sequence}")
             available_stacks = find_stacks_to_move_card(
                 cloned_board, sequence.top_card(), ignore_empty=True
@@ -1033,7 +1031,9 @@ def move_card_splitting(
                 if partial_moves:
                     moves.extend(partial_moves)
                     cloned_board.execute_moves(partial_moves)
-                    sequences.drop_sequence_by_id(i)
+                    sequences = source_stack.get_accessible_sequences(
+                        first_card_id=card_to_move
+                    )
                     move_made = True
                     break
 
@@ -1049,9 +1049,8 @@ def move_card_splitting(
             # Starting from the topmost attempt to move single cards in the most bottom
             # sequences, considering a number of sequences equal to the DoF
             # Don't consider the last sequence as it makes no difference to move a card from there
-            for i in range(k - available_dof - 1, k - 1):
-                sequence = sequences[i]
-                for j, card in enumerate(sequence, start=0):
+            for sequence in reversed(sequences[-available_dof - 1 : -1]):
+                for j, card in enumerate(sequence, start=sequence.start_index):
                     available_stacks = find_stacks_to_move_card(
                         cloned_board, card, ignore_empty=True
                     )
@@ -1061,15 +1060,14 @@ def move_card_splitting(
                             cloned_board,
                             source_id,
                             available_stacks[0],
-                            sequence.start_index + j,
+                            j,
                         )
                         if partial_moves:
                             moves.extend(partial_moves)
                             cloned_board.execute_moves(partial_moves)
-                            # Delete sequences following the current one. This one has not been fully moved yet.
-                            # Deleting the cards from the sequence is not required as it won't be considered on the
-                            # Following iteration.
-                            sequences.drop_sequence_by_id(i + 1)
+                            sequences = source_stack.get_accessible_sequences(
+                                first_card_id=card_to_move
+                            )
                             move_made = True
                             break
 
@@ -1077,6 +1075,7 @@ def move_card_splitting(
                     break
 
         if k == len(sequences):
+            # No progress was made at this iteration, this should be impossible
             raise SystemError("This should never happen. Please, fix my algorithm.")
 
     return moves
@@ -1098,7 +1097,7 @@ def _can_move_splitting(
         if sequence == sequences[0]:
             if sequences_above > last_available_dof:
                 return False
-            break
+            return True
 
         if sequences_above > available_dof:
             return False
@@ -1112,7 +1111,7 @@ def _can_move_splitting(
         else:
             sequences_above += 1
 
-    return True
+    raise SystemError("Should never get here")
 
 
 def _can_stack_sequence(board, sequence):
