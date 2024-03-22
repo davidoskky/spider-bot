@@ -1,9 +1,10 @@
 import collections.abc
+from typing import Generator, Iterator
 
 from deck import Card
 
 
-class CardSequence(collections.abc.Sequence):
+class CardSequence(collections.abc.Sequence[Card]):
     """Sequence of cards of the same suit in decreasing order"""
 
     def __init__(self, sequence: list[Card], start_index: int) -> None:
@@ -31,10 +32,10 @@ class CardSequence(collections.abc.Sequence):
         if self.cards:
             del self.cards[-1]
 
-    def top_card(self):
+    def top_card(self) -> Card:
         return self.cards[0]
 
-    def bottom_card(self):
+    def bottom_card(self) -> Card:
         return self.cards[-1]
 
     def drop_card(self, card_to_drop: Card, drop_previous=False):
@@ -47,7 +48,7 @@ class CardSequence(collections.abc.Sequence):
             self.cards = self.cards[:card_index]
 
 
-class StackedSequence(collections.abc.Sequence):
+class StackedSequence(collections.abc.Sequence[CardSequence]):
     """Sequence of cards in decreasing order"""
 
     def __init__(self, sequence: list[Card], start_index: int) -> None:
@@ -66,6 +67,9 @@ class StackedSequence(collections.abc.Sequence):
     def __getitem__(self, index):
         return self.sequences[index]
 
+    def __iter__(self) -> Iterator[CardSequence]:
+        return iter(self.sequences)
+
     def __repr__(self):
         return repr(self.sequences)
 
@@ -75,7 +79,7 @@ class StackedSequence(collections.abc.Sequence):
         else:
             return None
 
-    def enumerate_cards(self):
+    def enumerate_cards(self) -> Iterator[tuple[int, Card]]:
         if not self.sequences:
             return
 
@@ -86,7 +90,7 @@ class StackedSequence(collections.abc.Sequence):
                 yield index_offset + i, card
             index_offset += len(seq)
 
-    def get_cards(self):
+    def get_cards(self) -> list[Card]:
         cards = []
         for sequence in self.sequences:
             cards.extend(sequence.cards)
@@ -105,10 +109,10 @@ class StackedSequence(collections.abc.Sequence):
             if len(self.sequences[-1]) == 0:
                 del self.sequences[-1]
 
-    def top_card(self):
+    def top_card(self) -> Card:
         return self.sequences[0].cards[0]
 
-    def bottom_card(self):
+    def bottom_card(self) -> Card:
         return self.sequences[-1].cards[-1]
 
     def drop_sequence_by_id(self, index: int, drop_previous=False):
