@@ -1267,6 +1267,7 @@ def _move_sequence_to_no_splits(
             )
             stack_to_stack_moves.append(adjusted_move)
 
+        reverse_moves = []
         for move_set in stack_to_stack_moves:
             start, dest = move_set
             card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
@@ -1279,9 +1280,10 @@ def _move_sequence_to_no_splits(
             try:
                 move = Move(start, dest, card_id)
                 cloned_board.move_by_index(*move)
-                moves.append(move)
+                reverse_moves.append(move)
             except ValueError as e:
                 return moves
+        moves.extend(reverse_moves)
 
     elif len(sequences) == 1:
         move = Move(source_id, target_id, card_to_move)
