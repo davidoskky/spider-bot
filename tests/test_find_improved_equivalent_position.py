@@ -423,3 +423,21 @@ Stack 9: XX XX 4♠ 3♠ 2♠ 1♠ 11♠ 13♦ """
     result = find_improved_equivalent_position(board)
     assert result != [], "Should not move"
     # assert len(result) == 5
+
+
+def test_infinite_loop_22_03():
+    board = generate_board_from_string(
+        """Stack 0: 11♣ 10♥ 
+Stack 1: XX XX XX XX XX 5♦ 4♥ 3♥ 2♠ 1♦ 1♣ 10♣ 9♠ 8♠ 
+Stack 2: XX XX 13♦ 12♦ 5♦ 4♣ 
+Stack 3: XX XX XX XX XX 11♠ 10♥ 9♠ 8♠ 7♠ 6♠ 5♠ 4♠ 
+Stack 4: 5♣ 4♠ 8♥ 7♥ 6♥ 5♥ 
+Stack 5: XX XX 7♠ 4♦ 
+Stack 6: XX XX XX XX 2♣ 1♥ 
+Stack 7: XX XX XX XX 13♣ 12♣ 11♣ 10♣ 9♣ 8♣ 7♣ 
+Stack 8: 13♥ 12♥ 
+Stack 9: XX XX XX 13♠ 12♠ 11♦ 10♦ 9♦ 8♦ 7♦ 
+"""
+    )
+    result = find_improved_equivalent_position(board)
+    assert result == [], "Should not move"
