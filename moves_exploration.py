@@ -987,60 +987,16 @@ def move_card_splitting(
         first_card_id=card_to_move
     )
     logging.debug(f"Sequences: {sequences}")
-    if not sequences:
-        return []
 
     available_dof = dof_board(cloned_board)
     last_available_dof = available_dof
     if cloned_board.get_stack(target_id).is_empty():
         last_available_dof = max(0, last_available_dof - 1)
+    logging.debug(f"DoF for the last sequence: {last_available_dof}")
 
-    # We know the first sequence is movable as we have previously checked
-    movable_sequences = [0]
-
-    # Reverse the iteration of sequences, starting from the last down to the second sequence
-    # Note: The first sequence is skipped as it's handled separately
-    # The flag 'cards_above' indicates if there are cards above the current sequence that block movement
-    cards_above = False
-    for i in range(len(sequences) - 1, 0, -1):
-        sequence = sequences[i]
-
-        # When there are no cards above, consider only the first card of the sequence, useless to move the other ones
-        if not cards_above:
-            if _can_stack_sequence(board, sequence):
-                movable_sequences.append(i)
-                continue
-            else:
-                cards_above = True
-        else:
-            if _can_stack_sequence(board, sequence):
-                movable_sequences.append(i)
-                cards_above = False
-                continue
-            else:
-                if _can_stack_card_in_sequence(board, sequence):
-                    movable_sequences.append(i + 1)
-
-    movable_sequences = list(set(movable_sequences))
-    movable_sequences.sort()
-
-    differences: list[int] = []
-    for i, j in zip(movable_sequences[1:], movable_sequences):
-        differences.append(i - j - 1)
-    if movable_sequences[-1] != len(sequences) - 1:
-        differences.append(len(sequences) - 1 - movable_sequences[-1])
-
-    possible = False
-
-    if last_available_dof >= len(sequences) - 1:
-        possible = True
-
-    if not possible and not differences:
-        return []
-
-    if not possible and differences[0] > last_available_dof:
-        return []
-    if not possible and max(differences) > available_dof:
+    possible = _can_move_splitting(board, source_id, card_to_move, last_available_dof)
+    logging.debug(f"The move is possible: {possible}")
+    if not possible:
         return []
 
     # This while loop is dangerous as it could get us into an infinite loop.
@@ -1124,6 +1080,39 @@ def move_card_splitting(
             raise SystemError("This should never happen. Please, fix my algorithm.")
 
     return moves
+
+
+def _can_move_splitting(
+    board: Board, stack_id: int, card_id: int, last_available_dof: int
+):
+    """Check if it's possible to move based on the sequences and degrees of freedom."""
+    sequences = board.get_stack(stack_id).get_accessible_sequences(
+        first_card_id=card_id
+    )
+    if not sequences:
+        return False
+    available_dof = dof_board(board)
+    sequences_above = 0
+
+    for sequence in reversed(sequences):
+        if sequence == sequences[0]:
+            if sequences_above > last_available_dof:
+                return False
+            break
+
+        if sequences_above > available_dof:
+            return False
+        if _can_stack_sequence(board, sequence) and sequences_above <= available_dof:
+            sequences_above = 0
+        elif (
+            _can_stack_card_in_sequence(board, sequence)
+            and sequences_above <= available_dof
+        ):
+            sequences_above = 1
+        else:
+            sequences_above += 1
+
+    return True
 
 
 def _can_stack_sequence(board, sequence):
