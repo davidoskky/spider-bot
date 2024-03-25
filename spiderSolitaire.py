@@ -1,11 +1,14 @@
 import copy
-from operator import is_
-from random import randint, random
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from cardSequence import CardSequence, StackedSequence, cards_to_sequences
 from deck import Card, Deck, SimpleDeck
-from moves_exploration import Move, find_progressive_actions
+
+
+class Move(NamedTuple):
+    source_stack: int
+    destination_stack: int
+    card_index: int
 
 
 class Stack:
@@ -244,6 +247,24 @@ class Stack:
         return all_stacked_sequences
 
 
+class InvalidMoveError(Exception):
+    """Custom exception for invalid moves in the game."""
+
+    def __init__(
+        self,
+        source_id: int,
+        destination_id: int,
+        card_index: int,
+        game_state: str,
+        message: str = "Invalid move attempted",
+    ):
+        self.source_id = source_id
+        self.destination_id = destination_id
+        self.card_index = card_index
+        self.message = f"{message}. From {source_id}, To {destination_id}, card {card_index}, current game state: {game_state}"
+        super().__init__(self.message)
+
+
 class Board:
     INITIAL_STACKS_COUNT = 10
     CARDS_IN_SMALL_STACK = 5
@@ -306,9 +327,11 @@ class Board:
         if not self.is_valid_move(source_stack, destination_stack, card_index):
             source_id = self.stacks.index(source_stack)
             destination_id = self.stacks.index(destination_stack)
-            self.display_game_state()
-            raise ValueError(
-                f"Invalid move attempted. From {source_id}, To {destination_id}, card {card_index}"
+            raise InvalidMoveError(
+                source_id,
+                destination_id,
+                card_index,
+                game_state=self.game_state(),
             )
         sequence_to_move = source_stack.pop_sequence(card_index)
         destination_stack.add_sequence(sequence_to_move)
@@ -333,7 +356,7 @@ class Board:
         if self.deck.cards:
             return False
 
-        actions = find_progressive_actions(self)
+        actions = []
         if actions:
             return False
 
@@ -430,14 +453,21 @@ class Board:
 
         return False
 
+    def game_state(self) -> str:
+        """Return a string representation of the current state of the game."""
+        game_state_lines = []
+        for i, stack in enumerate(self.stacks):
+            stack_representation = f"Stack {i}: {str(stack)}"
+            game_state_lines.append(stack_representation)
+
+        missing_deals_line = f"Missing Deals: {len(self.deck.cards) / 10}, Completed Stacks: {len(self.completed_stacks)}"
+        game_state_lines.append(missing_deals_line)
+        return "\n".join(game_state_lines)
+
     def display_game_state(self):
         """Display the current state of the game"""
-        for i, stack in enumerate(self.stacks):
-            print(f"Stack {i}: ", end="")
-            print(stack)
-        print(
-            f"Missing Deals: {len(self.deck.cards)/10}Completed Stacks: {len(self.completed_stacks)}"
-        )
+        game_state = self.game_state()
+        print(game_state)
 
     def get_state(self):
         """Return the current game state as a list of lists (each list represents a stack)."""

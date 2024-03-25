@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from typing import TYPE_CHECKING, NamedTuple, Optional
+from typing import NamedTuple, Optional
 
 from cardSequence import CardSequence, StackedSequence, cards_to_sequences
 from deck import Card
-
-if TYPE_CHECKING:
-    from spiderSolitaire import Board, Stack
-
+from move_evaluator import MoveEvaluator
+from spiderSolitaire import Board, InvalidMoveError, Move, Stack
 
 DEFAULT_WEIGHTS = {
     "visible_card_weight": 10,
@@ -111,12 +109,6 @@ def score_board(board: Board, weights) -> int:
     score += completed_stacks_score
 
     return score
-
-
-class Move(NamedTuple):
-    source_stack: int
-    destination_stack: int
-    card_index: int
 
 
 class BFS_element(NamedTuple):
@@ -581,6 +573,7 @@ def move_cards_removing_interfering(
     """
     # TODO: This should use sequences
     moves: list[Move] = []
+    move_evaluator = MoveEvaluator(board)
     cloned_board = board.clone()
 
     target_stack = cloned_board.get_stack(target_stack_id)
@@ -600,74 +593,69 @@ def move_cards_removing_interfering(
     # Clear any cards covering the target position
     # Maybe this should be done by sequence as well
     clearance_moves = _move_stacked_to_temporary_position(
-        cloned_board, target_stack_id, target_card_id
+        move_evaluator.board, target_stack_id, target_card_id
     )
     logging.debug(
         f"move_cards_removing_interfering: clearance_moves = {clearance_moves}"
     )
-    cloned_board.execute_moves(clearance_moves)
+    move_evaluator.moves_possible(clearance_moves)
 
     moves_to_complete_switch = move_card_splitting(
-        cloned_board, source_stack_id, target_stack_id, source_card_id
+        move_evaluator.board, source_stack_id, target_stack_id, source_card_id
     )
-    if moves_to_complete_switch:
-        moves.extend(clearance_moves)
-        moves.extend(moves_to_complete_switch)
-    elif len(source_sequences) > 1:
-        cloned_board = board.clone()
+    if move_evaluator.moves_possible(moves_to_complete_switch):
+        return move_evaluator.get_moves()
+
+    if len(source_sequences) > 1:
+        move_evaluator.reset()
         covering_sequence_id = source_sequences[1].start_index
         clearance_moves = _move_stacked_to_temporary_position(
-            cloned_board,
+            move_evaluator.board,
             source_stack_id,
             covering_sequence_id,
             ignored_stacks=[target_stack_id],
         )
-        cloned_board.execute_moves(clearance_moves)
+        move_evaluator.moves_possible(clearance_moves)
         second_clearance_moves = _move_stacked_to_temporary_position(
-            cloned_board,
+            move_evaluator.board,
             target_stack_id,
             target_card_id,
             ignored_stacks=[source_stack_id],
         )
-        cloned_board.execute_moves(second_clearance_moves)
+        move_evaluator.moves_possible(second_clearance_moves)
         moves_to_complete_switch = move_card_splitting(
-            cloned_board, source_stack_id, target_stack_id, source_card_id
+            move_evaluator.board, source_stack_id, target_stack_id, source_card_id
         )
-        if moves_to_complete_switch:
-            moves.extend(clearance_moves)
-            moves.extend(second_clearance_moves)
-            moves.extend(moves_to_complete_switch)
-        else:
-            first_sequence = source_sequences[0]
-            for card_index in range(
-                source_card_id + 1, source_card_id + len(first_sequence)
-            ):
-                cloned_board = board.clone()
-                individual_clearance_moves = _move_stacked_to_temporary_position(
-                    cloned_board,
-                    source_stack_id,
-                    card_index,
-                    ignored_stacks=[target_stack_id],
-                )
-                cloned_board.execute_moves(individual_clearance_moves)
-                second_clearance_moves = _move_stacked_to_temporary_position(
-                    cloned_board,
-                    target_stack_id,
-                    target_card_id,
-                    ignored_stacks=[source_stack_id],
-                )
-                cloned_board.execute_moves(second_clearance_moves)
+        if move_evaluator.moves_possible(moves_to_complete_switch):
+            return move_evaluator.get_moves()
 
-                # Try the main move again after each individual card move
-                individual_moves_to_complete_switch = move_card_splitting(
-                    cloned_board, source_stack_id, target_stack_id, source_card_id
-                )
-                if individual_moves_to_complete_switch:
-                    moves.extend(individual_clearance_moves)
-                    moves.extend(second_clearance_moves)
-                    moves.extend(individual_moves_to_complete_switch)
-                    break
+        first_sequence = source_sequences[0]
+        for card_index in range(
+            source_card_id + 1, source_card_id + len(first_sequence)
+        ):
+            move_evaluator.reset()
+            individual_clearance_moves = _move_stacked_to_temporary_position(
+                move_evaluator.board,
+                source_stack_id,
+                card_index,
+                ignored_stacks=[target_stack_id],
+            )
+            move_evaluator.moves_possible(individual_clearance_moves)
+            second_clearance_moves = _move_stacked_to_temporary_position(
+                move_evaluator.board,
+                target_stack_id,
+                target_card_id,
+                ignored_stacks=[source_stack_id],
+            )
+            move_evaluator.moves_possible(second_clearance_moves)
 
+            # Try the main move again after each individual card move
+            individual_moves_to_complete_switch = move_card_splitting(
+                move_evaluator.board, source_stack_id, target_stack_id, source_card_id
+            )
+            if move_evaluator.moves_possible(individual_moves_to_complete_switch):
+                return move_evaluator.get_moves()
+    # TODO: Finish improving this
     return moves
 
 
@@ -1047,7 +1035,7 @@ def move_card_splitting(
                 raise SystemError("This should never happen. Please, fix my algorithm.")
 
             # Starting from the topmost attempt to move single cards in the most bottom
-            # sequences, considering a number of sequences equal to the DoF
+            # sequences, considering a number of sequences equal to the DoF + 1 (stacking on top of other card)
             # Don't consider the last sequence as it makes no difference to move a card from there
             for sequence in reversed(sequences[-available_dof - 1 : -1]):
                 for j, card in enumerate(sequence, start=sequence.start_index):
@@ -1229,6 +1217,7 @@ def _move_sequence_to_no_splits(
     # TODO: This is not the most optimal movement strategy
     # TODO: This fails as it doesn't free the stacks which have been occupied
     moves: list[Move] = []
+    move_evaluator = MoveEvaluator(board)
     cloned_board = board.clone()
     source_stack = cloned_board.get_stack(source_id)
     target_is_empty = cloned_board.get_stack(target_id).is_empty()
@@ -1244,7 +1233,7 @@ def _move_sequence_to_no_splits(
 
     if len(sequences) > 1:
         stack_to_stack_moves = _optimal_stacked_reversible_movement(
-            cloned_board,
+            move_evaluator.board,
             source_id,
             len(sequences) - 1 if not target_is_empty else len(sequences),
             final_stack=target_id if target_is_empty else None,
@@ -1269,25 +1258,25 @@ def _move_sequence_to_no_splits(
         reverse_moves = []
         for move_set in stack_to_stack_moves:
             start, dest = move_set
-            card_id = cloned_board.stacks[start].first_card_of_valid_sequence()
+            card_id = move_evaluator.board.stacks[start].first_card_of_valid_sequence()
             if start == source_id and card_id < card_to_move:
                 card_id = card_to_move
 
             # TODO: A better solution should be found for this problem
             # The fact is that some times after an irreversible move it
             # is not possible to move all cards to the destination stack
-            try:
-                move = Move(start, dest, card_id)
-                cloned_board.move_by_index(*move)
+            move = Move(start, dest, card_id)
+            if move_evaluator.move_possible(move):
                 reverse_moves.append(move)
-            except ValueError as e:
+            else:
                 return moves
+
         moves.extend(reverse_moves)
 
     elif len(sequences) == 1:
         move = Move(source_id, target_id, card_to_move)
-        moves.append(move)
-        cloned_board.move_by_index(*move)
+        if move_evaluator.move_possible(move):
+            moves.append(move)
 
     logging.debug(f"_move_card_to_no_splits: moves = {moves}")
 
