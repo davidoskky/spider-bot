@@ -1273,7 +1273,7 @@ def _move_sequence_to_no_splits(
 
         moves.extend(reverse_moves)
 
-    elif len(sequences) == 1:
+    else:
         move = Move(source_id, target_id, card_to_move)
         if move_evaluator.move_possible(move):
             moves.append(move)
