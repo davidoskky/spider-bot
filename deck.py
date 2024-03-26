@@ -1,24 +1,57 @@
 import random
-from collections import namedtuple
+from dataclasses import dataclass
+from enum import Enum, IntEnum, auto
 
-SUITS = "♠♣♥♦"
+
+class Suit(Enum):
+    SPADES = auto()
+    CLUBS = auto()
+    HEARTS = auto()
+    DIAMONDS = auto()
+
+    def __str__(self):
+        return "♠♣♥♦"[self.value - 1]
 
 
+class Rank(IntEnum):
+    ACE = 1
+    TWO = auto()
+    THREE = auto()
+    FOUR = auto()
+    FIVE = auto()
+    SIX = auto()
+    SEVEN = auto()
+    EIGHT = auto()
+    NINE = auto()
+    TEN = auto()
+    JACK = auto()
+    QUEEN = auto()
+    KING = auto()
+
+    def __str__(self):
+        special_ranks = {1: "A", 11: "J", 12: "Q", 13: "K"}
+        return special_ranks.get(self.value, str(self.value))
+
+    @property
+    def is_ace(self):
+        return self == Rank.ACE
+
+    @property
+    def is_king(self):
+        return self == Rank.KING
+
+
+@dataclass(frozen=True)
 class Card:
-    def __init__(self, rank: int, suit):
-        self.rank = rank
-        self.suit = suit
-
-    def clone(self):
-        """Create a deep clone of this card."""
-        return Card(self.rank, self.suit)
+    rank: Rank
+    suit: Suit
 
     def __repr__(self):
-        return f"{self.rank}{SUITS[self.suit]}"
+        return f"{self.rank}{self.suit}"
 
     def encode(self):
         """Encode a card into a unique identifier."""
-        return self.suit * 13 + self.rank
+        return self.suit.value * 13 + self.rank
 
     def can_stack(self, card: "Card") -> bool:
         """Check if the given card can be stacked on this card"""
@@ -36,10 +69,7 @@ class Deck:
     def __init__(self, seed=None, cards: list[Card] | None = None):
         if cards is None:
             self.cards = [
-                Card(rank, suit)
-                for suit in range(4)
-                for rank in range(1, 14)
-                for _ in range(2)  # 2 decks
+                Card(rank, suit) for suit in Suit for rank in Rank for _ in range(2)
             ]
             if seed:
                 random.seed(seed)
@@ -55,16 +85,3 @@ class Deck:
         drawn_cards = self.cards[-count:]
         self.cards = self.cards[:-count]
         return drawn_cards
-
-
-class SimpleDeck(Deck):
-    def __init__(self, seed=None):
-        self.cards = [
-            Card(rank, suit)
-            for suit in range(2)
-            for rank in range(1, 14)
-            for _ in range(1)  # 2 decks
-        ]
-        if seed:
-            random.seed = seed
-        random.shuffle(self.cards)

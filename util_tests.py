@@ -1,4 +1,4 @@
-from deck import Card, Deck
+from deck import Card, Deck, Rank, Suit
 from spiderSolitaire import Board, Stack
 
 '''
@@ -17,16 +17,16 @@ Stack 9: XX XX XX XX 5♠ 3♠ 2♠ 1♦ 2♦ 8♣ 7♠ 6♠
 '''
 
 
-def parse_card(card_str):
+def parse_card(card_str: str) -> Card:
     """Parse a card string into a Card object."""
-    suit_map = {"♠": 0, "♣": 1, "♥": 2, "♦": 3}
+    suit_map = {"♠": Suit.SPADES, "♣": Suit.CLUBS, "♥": Suit.HEARTS, "♦": Suit.DIAMONDS}
+    rank_map = {"A": Rank.ACE, "J": Rank.JACK, "Q": Rank.QUEEN, "K": Rank.KING}
 
-    if len(card_str) < 1 or card_str[-1] not in suit_map:
+    if len(card_str) < 2 or card_str[-1] not in suit_map:
         raise ValueError(f"Invalid card format: {card_str}")
 
-    # Extract rank and suit from card string
     rank_str, suit_str = card_str[:-1], card_str[-1]
-    rank = int(rank_str)
+    rank = rank_map.get(rank_str, Rank(int(rank_str)))
     suit = suit_map[suit_str]
 
     return Card(rank, suit)
@@ -41,7 +41,7 @@ def parse_stack(stack_str):
         if card_str != "XX":
             cards.append(parse_card(card_str))
         else:
-            cards.append(Card(1, 0))
+            cards.append(Card(Rank.ACE, Suit.SPADES))
 
     return cards
 
@@ -61,7 +61,6 @@ def generate_board_from_string(board_str):
         stack_part = stack_list[1]
         cards = parse_stack(stack_part)
         stack = Stack(cards)
-        # Determine the first visible card (assuming face-down cards are represented by 'XX')
         stack.first_visible_card = next(
             (i for i, card in enumerate(stack_part.split(" ")) if card != "XX"), 0
         )

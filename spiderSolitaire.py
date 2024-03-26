@@ -1,9 +1,9 @@
 import copy
 from dataclasses import dataclass
-from typing import NamedTuple, Optional
+from typing import Optional
 
-from cardSequence import CardSequence, StackedSequence, cards_to_sequences
-from deck import Card, Deck, SimpleDeck
+from cardSequence import CardSequence, StackedSequence
+from deck import Card, Deck
 
 
 @dataclass(frozen=True)
@@ -775,24 +775,3 @@ class SpiderSolitaire:
     def display_game_state(self):
         """Display the current state of the game"""
         self.board.display_game_state()
-
-
-class SimpleSpiderSolitaire(SpiderSolitaire):
-    def __init__(self, seed=None):
-        """Initialize the stacks: 4 stacks with 6 cards (last card face-up), and 6 stacks with 5 cards (last card face-up)"""
-        self.deck = SimpleDeck(seed)
-        self.stacks = []
-        self.completed_stacks = []
-        self.move_count = 0
-        self.just_completed_stack = False
-
-        for _ in range(4):
-            stack_cards = self.deck.draw(1)
-            self.stacks.append(Stack(stack_cards))
-
-        for _ in range(6):
-            stack_cards = self.deck.draw(2)
-            stack_cards += self.deck.draw(1)
-            self.stacks.append(Stack(stack_cards))
-
-        self.board = Board(deck=self.deck, stacks=self.stacks)
