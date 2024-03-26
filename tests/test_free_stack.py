@@ -71,7 +71,7 @@ def test_one_stack_can_be_freed_many_moves():
     result = free_stack(board, ignored_stacks)
 
     for move in result:
-        board.move_by_index(*move)
+        board.move(move)
     assert result != [], "Should not return an empty list"
     assert board.count_empty_stacks() == 3
 
@@ -93,7 +93,7 @@ def test_one_stack_can_be_freed_intermediate_change():
     result = free_stack(board, ignored_stacks)
 
     for move in result:
-        board.move_by_index(*move)
+        board.move(move)
     assert result != [], "Should not return an empty list"
     assert board.count_empty_stacks() == 3
 
@@ -115,7 +115,7 @@ def test_complex_splitting():
     result = free_stack(board, ignored_stacks)
 
     for move in result:
-        board.move_by_index(*move)
+        board.move(move)
     assert result != [], "Should not return an empty list"
     assert board.count_empty_stacks() == 3
 
@@ -143,7 +143,7 @@ def test_identified_1():
     result = free_stack(board, ignored_stacks)
 
     for move in result:
-        board.move_by_index(*move)
+        board.move(move)
     assert result != [], "Should not return an empty list"
     assert board.count_empty_stacks() == 3
 
@@ -163,6 +163,6 @@ def test_identified_1_intermediate():
     logging.debug(f"{result}")
 
     for move in result:
-        board.move_by_index(*move)
+        board.move(move)
     assert result != [], "Should not return an empty list"
     assert board.count_empty_stacks() == 2

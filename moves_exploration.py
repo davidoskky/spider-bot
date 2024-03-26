@@ -805,6 +805,7 @@ def _move_stacked_to_temporary_position(
     - The choice of the temporary stack is determined by an internal strategy that may vary based on the board's
       current state and the specific rules or constraints of the game being played.
     """
+    # TODO: This appears to fail
     logging.debug(
         f"_move_stacked_to_temporary_position: attempting to move card {card_index} from stack {stack_id}"
     )
@@ -1189,13 +1190,13 @@ def _move_card_to_no_splits(
                 card_id = card_to_move
 
             move = Move(start, dest, card_id)
-            cloned_board.move_by_index(*move)
+            cloned_board.move(move)
             moves.append(move)
 
     if len(sequences) == 1 or not target_is_empty:
         move = Move(source_id, target_id, card_to_move)
         moves.append(move)
-        cloned_board.move_by_index(*move)
+        cloned_board.move(move)
 
     logging.debug(f"_move_card_to_no_splits: moves = {moves}")
 
@@ -1269,6 +1270,7 @@ def _move_sequence_to_no_splits(
             if move_evaluator.move_possible(move):
                 reverse_moves.append(move)
             else:
+                logging.debug(f"Error, move not possible {move}")
                 return moves
 
         moves.extend(reverse_moves)
@@ -1304,7 +1306,7 @@ def _optimal_stacked_reversible_movement(
     if not empty_stacks:
         return []
 
-    if amount_of_sequences > pow(2, len(empty_stacks)) - 1:
+    if amount_of_sequences > dof_board(board):
         return []
 
     if amount_of_sequences < 1:
@@ -1342,7 +1344,7 @@ def destacker(sequences: int, empty_stacks: list[int], source_id: int):
     moves = []
     while empty_stacks:
         # Using the maximum ensures always having at least 1, which covers the case in which only one stack is empty, in which one card has to be moved
-        to_move = max(2 ^ (len(empty_stacks) - 2), 1)
+        to_move = max(pow(2, len(empty_stacks) - 2), 1)
         stacks_to_free = []
 
         for _ in range(to_move):
@@ -1362,6 +1364,7 @@ def destacker(sequences: int, empty_stacks: list[int], source_id: int):
         # Free up stacks for the next iteration by moving all sequence to a single stack
         destination_stack = stacks_to_free.pop()
         logging.debug(f"to free {stacks_to_free}")
+        # TODO: This logic is completely broken
         for origin in reversed(stacks_to_free):
             moves.append((origin, destination_stack))
             empty_stacks.append(origin)

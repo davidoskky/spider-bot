@@ -1,14 +1,23 @@
 import copy
+from dataclasses import dataclass
 from typing import NamedTuple, Optional
 
 from cardSequence import CardSequence, StackedSequence, cards_to_sequences
 from deck import Card, Deck, SimpleDeck
 
 
-class Move(NamedTuple):
+@dataclass(frozen=True)
+class Move:
     source_stack: int
     destination_stack: int
     card_index: int
+
+    def __post_init__(self):
+        if self.source_stack < 0 or self.destination_stack < 0 or self.card_index < 0:
+            raise ValueError("Stack indices and card index must be non-negative")
+
+    def __str__(self):
+        return f"Move card from stack {self.source_stack} at index {self.card_index} to stack {self.destination_stack}"
 
 
 class Stack:
@@ -310,42 +319,50 @@ class Board:
         """Create a new Board object with a deep clone of the card disposition."""
         return Board(stacks=self.stacks, deck=self.deck.clone())
 
-    def is_valid_move(
-        self, from_stack: Stack, to_stack: Stack, card_index: int
-    ) -> bool:
+    def is_valid_move(self, move: Move) -> bool:
+        from_stack = self.get_stack(move.source_stack)
+        to_stack = self.get_stack(move.destination_stack)
+
         if from_stack.is_empty():
             return False
 
-        if card_index == 0 and to_stack.is_empty():
+        if move.card_index == 0 and to_stack.is_empty():
             return False
-        return to_stack.can_stack(
-            from_stack.cards[card_index]
-        ) and from_stack.is_valid_suit_sequence(card_index)
 
-    def move(self, source_stack: Stack, destination_stack: Stack, card_index: int):
+        return to_stack.can_stack(
+            from_stack.cards[move.card_index]
+        ) and from_stack.is_valid_suit_sequence(move.card_index)
+
+    def move(self, move: Move):
         """Move a sequence of cards from one stack to another"""
-        if not self.is_valid_move(source_stack, destination_stack, card_index):
-            source_id = self.stacks.index(source_stack)
-            destination_id = self.stacks.index(destination_stack)
+        if not self.is_valid_move(move):
             raise InvalidMoveError(
-                source_id,
-                destination_id,
-                card_index,
+                move.source_stack,
+                move.destination_stack,
+                move.card_index,
                 game_state=self.game_state(),
             )
-        sequence_to_move = source_stack.pop_sequence(card_index)
+
+        source_stack = self.get_stack(move.source_stack)
+        destination_stack = self.get_stack(move.destination_stack)
+
+        sequence_to_move = source_stack.pop_sequence(move.card_index)
         destination_stack.add_sequence(sequence_to_move)
         self.check_for_completion(destination_stack)
 
-    def move_by_index(self, source_stack_id, destination_stack_id, card_index):
-        """Move a sequence of cards from one stack to another"""
-        self.move(
-            self.stacks[source_stack_id], self.stacks[destination_stack_id], card_index
+    def move_by_index(
+        self, source_stack_id: int, destination_stack_id: int, card_index: int
+    ):
+        move = Move(
+            source_stack=source_stack_id,
+            destination_stack=destination_stack_id,
+            card_index=card_index,
         )
+        self.move(move)
 
     def execute_moves(self, moves: list[Move]):
         for move in moves:
-            self.move_by_index(*move)
+            self.move(move)
 
     def is_game_won(self) -> bool:
         """Check if the game has been won"""
@@ -731,10 +748,10 @@ class SpiderSolitaire:
         self.move_count = 0
         self.just_completed_stack = False
 
-    def move(self, from_stack, to_stack, card_index):
+    def move(self, move: Move):
         """Move a sequence of cards from one stack to another"""
-        if self.board.is_valid_move(from_stack, to_stack, card_index):
-            self.board.move(from_stack, to_stack, card_index)
+        if self.board.is_valid_move(move):
+            self.board.move(move)
 
             self.move_count += 1
 
