@@ -150,12 +150,8 @@ class Stack:
             return None
 
     def get_sequence(self) -> CardSequence:
-        first_card_id = self.first_card_of_valid_sequence()
-        if self.is_empty():
-            return CardSequence([], 0)
-
-        sequences = StackedSequence(self.cards[first_card_id:], first_card_id)
-        return sequences[-1]
+        sequences = self.get_accessible_sequences()
+        return sequences[-1] if sequences else CardSequence([], 0)
 
     def get_accessible_sequences(self, first_card_id=None) -> StackedSequence:
         """Return a list of CardSequence"""
