@@ -350,16 +350,6 @@ class Board:
         destination_stack.add_sequence(sequence_to_move)
         self.check_for_completion(destination_stack)
 
-    def move_by_index(
-        self, source_stack_id: int, destination_stack_id: int, card_index: int
-    ):
-        move = Move(
-            source_stack=source_stack_id,
-            destination_stack=destination_stack_id,
-            card_index=card_index,
-        )
-        self.move(move)
-
     def execute_moves(self, moves: list[Move]):
         for move in moves:
             self.move(move)
@@ -764,40 +754,6 @@ class SpiderSolitaire:
     def execute_moves(self, moves: list[Move]):
         self.board.execute_moves(moves)
         self.move_count += len(moves)
-
-    def move_by_index(self, from_stack_index, to_stack_index, card_index):
-        self.board.move_by_index(from_stack_index, to_stack_index, card_index)
-        self.move_count += 1
-
-        if self.is_game_won():
-            print("Congratulations! You won the game.")
-            return
-        if self.is_game_lost():
-            print("No more moves available. Game lost.")
-
-    def move_pile_to_pile(self, from_stack_index, to_stack_index) -> bool:
-        """Move a sequence of cards from one stack to another stack."""
-        if from_stack_index < 0 or from_stack_index >= len(self.board.stacks):
-            raise ValueError("Invalid from_stack_index")
-        if to_stack_index < 0 or to_stack_index >= len(self.board.stacks):
-            raise ValueError("Invalid to_stack_index")
-
-        from_stack = self.board.stacks[from_stack_index]
-        to_stack = self.board.stacks[to_stack_index]
-
-        if to_stack.is_empty():
-            card_index = from_stack.first_card_of_valid_sequence()
-            self.move(from_stack, to_stack, card_index)
-            return True
-
-        # Iterate through the from_stack to find a valid sequence to move
-        else:
-            for card_index in range(len(from_stack.cards) - 1, -1, -1):
-                if self.board.is_valid_move(from_stack, to_stack, card_index):
-                    self.move(from_stack, to_stack, card_index)
-                    return True
-
-        return False
 
     def is_game_won(self):
         """Check if the game has been won"""
