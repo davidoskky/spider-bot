@@ -14,6 +14,9 @@ class MoveEvaluator:
         return self.moves_possible([move])
 
     def moves_possible(self, moves: list[Move]) -> bool:
+        if not moves:
+            return False
+
         initial_board = self.board.clone()
         try:
             self.board.execute_moves(moves)

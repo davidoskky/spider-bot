@@ -159,3 +159,21 @@ Stack 9: XX XX 4♠ 3♠ 2♠ 1♠ 11♠ 13♦ """
     result = move_cards_removing_interfering(board, 0, 8, 6, 8)
     assert result != [], "Should move"
     # assert len(result) == 5
+
+
+def test_invalid_move_26_03():
+    board = generate_board_from_string(
+        """Stack 0: XX XX XX XX XX 5♠
+Stack 1: XX XX XX 7♠ 8♦
+Stack 2: XX XX XX 5♠ 4♥ 13♥ 12♥ 11♥ 10♥ 9♥ 8♥ 7♥ 6♥
+Stack 3: 8♦ 7♣ 7♠ 6♠
+Stack 4: 
+Stack 5: XX XX 12♥ 5♣ 4♠ 3♦ 1♠
+Stack 6: XX XX XX XX 13♦ 10♦ 9♣ 8♥
+Stack 7: XX XX 13♣ 12♣ 11♣ 10♣ 9♠ 8♣ 1♦ 4♦ 3♥
+Stack 8: XX XX XX 10♠ 9♠ 8♠ 1♣ 5♣ 4♣ 3♦ 2♦ 1♣
+Stack 9: XX XX 4♠ 3♠ 2♠ 1♠ 11♠ 13♦
+"""
+    )
+    result = move_cards_removing_interfering(board, 8, 7, 9, 10)
+    assert result == [], "Should not move"
