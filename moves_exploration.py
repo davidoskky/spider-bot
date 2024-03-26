@@ -1259,7 +1259,9 @@ def _move_sequence_to_no_splits(
         reverse_moves = []
         for move_set in stack_to_stack_moves:
             start, dest = move_set
-            card_id = move_evaluator.board.stacks[start].first_card_of_valid_sequence()
+            card_id = move_evaluator.board.get_stack(
+                start
+            ).first_card_of_valid_sequence()
             if start == source_id and card_id < card_to_move:
                 card_id = card_to_move
 

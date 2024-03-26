@@ -14,7 +14,13 @@ class Move:
 
     def __post_init__(self):
         if self.source_stack < 0 or self.destination_stack < 0 or self.card_index < 0:
-            raise ValueError("Stack indices and card index must be non-negative")
+            raise InvalidMoveError(
+                self.source_stack,
+                self.destination_stack,
+                self.card_index,
+                "",
+                "Negative index introduced",
+            )
 
     def __str__(self):
         return f"Move card from stack {self.source_stack} at index {self.card_index} to stack {self.destination_stack}"
@@ -27,7 +33,7 @@ class Stack:
 
     def __init__(self, cards: list[Card]):
         self.cards = cards
-        self.first_visible_card = len(cards) - 1
+        self.first_visible_card = max(len(cards) - 1, 0)
 
     def __repr__(self):
         representation = [
@@ -53,16 +59,14 @@ class Stack:
 
     def reveal_top_card(self):
         """Flip the top card to face-up."""
-        if self.cards and self.first_visible_card >= len(self.cards):
-            self.first_visible_card = len(self.cards) - 1
+        if self.first_visible_card >= len(self.cards):
+            self.first_visible_card = max(len(self.cards) - 1, 0)
 
     def is_valid_suit_sequence(self, start_index: int) -> bool:
-        return self._is_valid_sequence(
-            start_index, lambda c, n: c.can_stack(n) and c.same_suit(n)
-        )
+        return self._is_valid_sequence(start_index, suit_sequence=True)
 
     def is_valid_stacked_sequence(self, start_index: int) -> bool:
-        return self._is_valid_sequence(start_index, lambda c, n: c.can_stack(n))
+        return self._is_valid_sequence(start_index, suit_sequence=False)
 
     def card_position(self, card: Card) -> int | None:
         try:
@@ -71,19 +75,22 @@ class Stack:
         except ValueError:
             return None
 
-    def _is_valid_sequence(self, start_index: int, condition) -> bool:
+    def _is_valid_sequence(self, start_index: int, suit_sequence=False) -> bool:
         if not self.is_visible(start_index):
             return False
-        return all(
-            condition(card, next_card)
-            for card, next_card in zip(
-                self.cards[start_index:], self.cards[start_index + 1 :]
-            )
-        )
+        try:
+            sequence = self.cards[start_index:]
+            if suit_sequence:
+                CardSequence(sequence, start_index)
+            else:
+                StackedSequence(sequence, start_index)
+            return True
+        except ValueError:
+            return False
 
     def count_sequences_to_index(self, index: int) -> int:
         """
-        Count the number of stacked sequences needed to reach a given index in a stack.
+        Count the number of stacked sequences above a given index in a stack.
 
         :param stack: The stack of cards.
         :param index: The index of the card in the stack.
@@ -95,19 +102,8 @@ class Stack:
         if self.is_empty():
             return 0
 
-        all_stacked_sequences = self.get_all_stacked_sequences()
-        count = 0
-        current_index = len(self.cards) - 1
-
-        for sequence in reversed(all_stacked_sequences):
-            sequence_length = len(sequence)
-            if current_index - sequence_length < index:
-                count += 1
-                break
-            count += 1
-            current_index -= sequence_length
-
-        return count
+        all_stacked_sequences = self.get_accessible_sequences(index)
+        return max(len(all_stacked_sequences) - 1, 0)
 
     def visible_cards(self) -> list[Card]:
         return self.cards[self.first_visible_card :]
@@ -156,22 +152,20 @@ class Stack:
 
     def get_sequence(self) -> CardSequence:
         first_card_id = self.first_card_of_valid_sequence()
-        sequences = cards_to_sequences(
-            self.cards[first_card_id:], first_id=first_card_id
-        )
-        if len(sequences) > 1:
-            raise SystemError("Cards not in sequence")
-        elif sequences:
-            return sequences[0]
-        else:
+        if self.is_empty():
             return CardSequence([], 0)
+
+        sequences = StackedSequence(self.cards[first_card_id:], first_card_id)
+        return sequences[-1]
 
     def get_accessible_sequences(self, first_card_id=None) -> StackedSequence:
         """Return a list of CardSequence"""
         if first_card_id is None:
             first_card_id = self.first_card_of_valid_stacked()
         elif first_card_id < self.first_card_of_valid_stacked():
-            raise IndexError
+            raise IndexError(
+                f"Requested card {first_card_id}, but first stacked is {self.first_card_of_valid_stacked()}, {self}"
+            )
 
         return StackedSequence(self.cards[first_card_id:], start_index=first_card_id)
 
