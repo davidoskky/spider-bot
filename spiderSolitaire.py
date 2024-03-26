@@ -36,11 +36,10 @@ class Stack:
         self.first_visible_card = max(len(cards) - 1, 0)
 
     def __repr__(self):
-        representation = [
-            repr(card) + " " if i >= self.first_visible_card else "XX "
+        return " ".join(
+            repr(card) if i >= self.first_visible_card else "XX"
             for i, card in enumerate(self.cards)
-        ]
-        return "".join(representation)
+        )
 
     def clone(self):
         cloned_stack = Stack(copy.copy(self.cards))
