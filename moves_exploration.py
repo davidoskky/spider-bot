@@ -270,7 +270,7 @@ def find_improved_equivalent_position(board: Board) -> list[Move]:
         )
 
         for card_index, card in stacked_cards.enumerate_cards():
-            if card.rank == 14:  # The king cannot be moved reversibly
+            if card.rank == 14:
                 continue
 
             for target_stack_index, target_stack in enumerate(board.stacks):

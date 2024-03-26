@@ -3,11 +3,11 @@ import random
 
 from moves_exploration import (DEFAULT_WEIGHTS,
                                find_improved_equivalent_position,
+                               find_move_increasing_stacked_length,
                                find_move_increasing_stacked_length_manual,
-                               find_moves_freeing_covered_cards,
                                find_progressive_actions,
                                find_progressive_actions_manual, free_stack,
-                               is_board_winnable, score_board)
+                               score_board)
 from spiderSolitaire import Move, SpiderSolitaire
 
 

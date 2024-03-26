@@ -406,7 +406,7 @@ class Board:
                 continue
             if to_stack.is_empty():
                 used_empty_stack = True
-            if self.is_valid_move(self.stacks[from_index], to_stack, card_index):
+            if self.is_valid_move(move):
                 valid_moves.append(move)
         return valid_moves
 
