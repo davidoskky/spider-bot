@@ -154,15 +154,16 @@ class Stack:
         return sequences[-1] if sequences else CardSequence([], 0)
 
     def get_accessible_sequences(self, first_card_id=None) -> StackedSequence:
-        """Return a list of CardSequence"""
-        if first_card_id is None:
-            first_card_id = self.first_card_of_valid_stacked()
-        elif first_card_id < self.first_card_of_valid_stacked():
+        first_card_id = (
+            first_card_id
+            if first_card_id is not None
+            else self.first_card_of_valid_stacked()
+        )
+        if first_card_id < self.first_visible_card:
             raise IndexError(
-                f"Requested card {first_card_id}, but first stacked is {self.first_card_of_valid_stacked()}, {self}"
+                f"Requested card {first_card_id}, but first visible is {self.first_visible_card}, {self}"
             )
-
-        return StackedSequence(self.cards[first_card_id:], start_index=first_card_id)
+        return StackedSequence(self.cards[first_card_id:], first_card_id)
 
     def first_card_of_valid_stacked(self) -> int:
         """Find the index of the first card of the valid sequence from the bottom."""
