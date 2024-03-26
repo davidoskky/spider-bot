@@ -1,15 +1,14 @@
 import os
 import random
 
-from moves_exploration import (DEFAULT_WEIGHTS, Move,
+from moves_exploration import (DEFAULT_WEIGHTS,
                                find_improved_equivalent_position,
-                               find_move_increasing_stacked_length,
                                find_move_increasing_stacked_length_manual,
                                find_moves_freeing_covered_cards,
                                find_progressive_actions,
                                find_progressive_actions_manual, free_stack,
                                is_board_winnable, score_board)
-from spiderSolitaire import SpiderSolitaire
+from spiderSolitaire import Move, SpiderSolitaire
 
 
 class SpiderSolitaireBot:
@@ -40,7 +39,7 @@ class SpiderSolitaireBot:
             # Simulate the move
             simulated_board = self.game.board.clone()
             for move in path:
-                simulated_board.move_by_index(*move)
+                simulated_board.move(move)
 
             # Score the resulting board state
             score = score_board(simulated_board, weights)
@@ -163,5 +162,5 @@ class SpiderSolitaireBot:
     def _execute_moves(self, moves):
         if moves:
             for move in moves[0]:
-                self.game.board.move_by_index(*move)
+                self.game.board.move(move)
                 # print(f"from {move[0]}, to {move[1]}")
